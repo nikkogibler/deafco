@@ -144,9 +144,10 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
+  await supabase.auth.signOut();
+  window.location.href = '/login'; // full page reload
+};
+
 
   if (loading) {
     return (
