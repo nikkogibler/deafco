@@ -1,11 +1,28 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
 export default function Login() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getUser();
+
+      if (data?.user) {
+        // Already logged in — send to dashboard
+        router.push('/dashboard');
+      }
+    };
+
+    checkSession();
+  }, []);
+
   const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
-        redirectTo: 'https://deafco.vercel.app' // 👈 where Supabase redirects AFTER login
+        redirectTo: 'https://deafco.vercel.app'
       }
     });
   };
