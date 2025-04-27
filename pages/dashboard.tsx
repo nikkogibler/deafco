@@ -34,23 +34,37 @@ export default function Dashboard() {
 
       setUserEmail(user.email);
 
-      // 📥 Run upsert to avoid duplicate key errors
-      console.log('📥 Running upsert instead of insert...');
-      const { error: upsertError } = await supabase.from('users')
-        .upsert(
-          {
-            id: user.id,
-            email: user.email,
-            role: 'freemium',
-          },
-          { onConflict: 'id' }
-        );
+      // ⚡ Attempt to update first
+      console.log('📦 Attempting to update existing user first...');
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          email: user.email,
+          role: 'freemium',
+        })
+        .eq('id', user.id);
 
-      if (upsertError) {
-        console.error('🔥 UPSERT ERROR:', upsertError.message || upsertError);
-        alert('Error upserting user: ' + (upsertError.message || upsertError));
+      if (updateError) {
+        console.error('❌ Update failed, trying insert instead...', updateError.message);
+
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([
+            {
+              id: user.id,
+              email: user.email,
+              role: 'freemium',
+            },
+          ]);
+
+        if (insertError) {
+          console.error('🔥 Final INSERT FAIL:', insertError.message);
+          alert('Cannot add you to the system. Contact support.');
+        } else {
+          console.log('✅ Inserted as fallback');
+        }
       } else {
-        console.log('✅ User upserted successfully');
+        console.log('✅ User updated successfully');
       }
 
       // 🎧 Save Spotify tokens
@@ -75,7 +89,6 @@ export default function Dashboard() {
         }
       }
 
-      console.log('🛑 Done — setLoading(false)');
       setLoading(false);
     };
 
