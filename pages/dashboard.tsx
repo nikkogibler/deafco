@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nowPlaying, setNowPlaying] = useState<any | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -34,8 +35,7 @@ export default function Dashboard() {
 
       setUserEmail(user.email);
 
-      // ⚡ Attempt to update first
-      console.log('📦 Attempting to update existing user first...');
+      // Update or insert user
       const { error: updateError } = await supabase
         .from('users')
         .update({
@@ -45,8 +45,6 @@ export default function Dashboard() {
         .eq('id', user.id);
 
       if (updateError) {
-        console.error('❌ Update failed, trying insert instead...', updateError.message);
-
         const { error: insertError } = await supabase
           .from('users')
           .insert([
@@ -67,29 +65,40 @@ export default function Dashboard() {
         console.log('✅ User updated successfully');
       }
 
-      // 🎧 Save Spotify tokens
-      const accessToken = session?.provider_token;
-      const refreshToken = session?.provider_refresh_token;
-      console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
+      // Fetch Spotify tokens from users table
+      const { data: userData, error: userFetchError } = await supabase
+        .from('users')
+        .select('spotify_access_token')
+        .eq('id', user.id)
+        .single();
 
-      if (accessToken && refreshToken) {
-        const { error: tokenUpdateError } = await supabase
-          .from('users')
-          .update({
-            spotify_access_token: accessToken,
-            spotify_refresh_token: refreshToken,
-            token_expires_at: new Date(Date.now() + 3600 * 1000),
-          })
-          .eq('id', user.id);
-
-        if (tokenUpdateError) {
-          console.error('❌ Error updating Spotify tokens:', tokenUpdateError.message);
-        } else {
-          console.log('✅ Spotify tokens saved to user record');
-        }
+      if (userData?.spotify_access_token) {
+        fetchNowPlaying(userData.spotify_access_token);
       }
 
       setLoading(false);
+    };
+
+    const fetchNowPlaying = async (accessToken: string) => {
+      try {
+        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (res.status === 204) {
+          setNowPlaying(null); // Nothing playing
+        } else if (res.ok) {
+          const data = await res.json();
+          console.log('🎶 Now Playing:', data);
+          setNowPlaying(data);
+        } else {
+          console.error('Failed to fetch now playing:', res.status);
+        }
+      } catch (err) {
+        console.error('Fetch error:', err);
+      }
     };
 
     checkAndInsertUser();
@@ -108,21 +117,36 @@ export default function Dashboard() {
     );
   }
 
+  const track = nowPlaying?.item;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center">
       <h1 className="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
-      {userEmail ? (
+      {userEmail && (
         <>
           <p className="mb-4">Logged in as: {userEmail}</p>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 bg-black text-white rounded-xl"
+            className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
           >
             Logout
           </button>
         </>
+      )}
+
+      {track ? (
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Now Playing:</h2>
+          <p className="mt-2 font-medium">{track.name}</p>
+          <p className="text-sm text-gray-600">{track.artists?.[0]?.name}</p>
+          <img
+            src={track.album?.images?.[0]?.url}
+            alt="Album Cover"
+            className="w-48 h-48 mt-4 rounded-lg shadow-lg"
+          />
+        </div>
       ) : (
-        <p>Something went wrong — no user email.</p>
+        <p>No track currently playing.</p>
       )}
     </div>
   );
