@@ -34,29 +34,6 @@ export default function Dashboard() {
 
       setUserEmail(user.email);
 
-      // 🎧 Capture Spotify tokens from session
-      const accessToken = session?.provider_token;
-      const refreshToken = session?.provider_refresh_token;
-      console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
-
-      // 💾 Save tokens into users table
-      if (accessToken && refreshToken) {
-        const { error: tokenUpdateError } = await supabase
-          .from('users')
-          .update({
-            spotify_access_token: accessToken,
-            spotify_refresh_token: refreshToken,
-            token_expires_at: new Date(Date.now() + 3600 * 1000),
-          })
-          .eq('id', user.id);
-
-        if (tokenUpdateError) {
-          console.error('❌ Error updating Spotify tokens:', tokenUpdateError.message);
-        } else {
-          console.log('✅ Spotify tokens saved to user record');
-        }
-      }
-
       // 🔍 Check if user exists
       const { data, error } = await supabase
         .from('users')
@@ -89,6 +66,28 @@ export default function Dashboard() {
         alert('Error checking user: ' + error.message);
       } else {
         console.log('✅ User already exists:', data);
+      }
+
+      // 🎧 Save Spotify tokens AFTER ensuring the user exists
+      const accessToken = session?.provider_token;
+      const refreshToken = session?.provider_refresh_token;
+      console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
+
+      if (accessToken && refreshToken) {
+        const { error: tokenUpdateError } = await supabase
+          .from('users')
+          .update({
+            spotify_access_token: accessToken,
+            spotify_refresh_token: refreshToken,
+            token_expires_at: new Date(Date.now() + 3600 * 1000),
+          })
+          .eq('id', user.id);
+
+        if (tokenUpdateError) {
+          console.error('❌ Error updating Spotify tokens:', tokenUpdateError.message);
+        } else {
+          console.log('✅ Spotify tokens saved to user record');
+        }
       }
 
       setLoading(false);
