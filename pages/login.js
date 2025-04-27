@@ -6,19 +6,8 @@ export default function Login() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Watch for live auth changes (esp. after Spotify login)
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          router.push('/dashboard');
-        } else {
-          setCheckingAuth(false); // No session? Show login button
-        }
-      }
-    );
-
-    // Run once on mount too
+    // Runs once on load
     supabase.auth.getSession().then(({ data }) => {
       if (data?.session?.user) {
         router.push('/dashboard');
@@ -27,7 +16,14 @@ export default function Login() {
       }
     });
 
-    return () => authListener.subscription.unsubscribe();
+    // Also watch for new sessions (after redirect from Spotify)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        router.push('/dashboard');
+      }
+    });
+
+    return () => listener?.subscription?.unsubscribe();
   }, []);
 
   const handleLogin = async () => {
@@ -39,7 +35,7 @@ export default function Login() {
     });
   };
 
-  if (checkingAuth) return <p>Checking login status…</p>;
+  if (checkingAuth) return <p>Checking login...</p>;
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
