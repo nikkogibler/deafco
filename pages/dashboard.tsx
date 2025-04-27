@@ -8,6 +8,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const checkAndInsertUser = async () => {
+      console.log('🚨 checkAndInsertUser is running');
       const {
         data: { session },
         error: sessionError,
