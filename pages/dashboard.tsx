@@ -25,6 +25,10 @@ export default function Dashboard() {
       }
 
       const user = session?.user;
+      const accessToken = session?.provider_token;
+const refreshToken = session?.provider_refresh_token;
+console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
+
       if (!user) {
         console.log('🚫 No user found in session');
         alert('No user found — not logged in.');
