@@ -1,10 +1,14 @@
-import supabase from '../lib/supabaseClient'; 
-
+import supabase from '../lib/supabaseClient';
 
 export default function Login() {
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'spotify' })
-  }
+    await supabase.auth.signInWithOAuth({
+      provider: 'spotify',
+      options: {
+        redirectTo: 'https://deafco.vercel.app' // 👈 where Supabase redirects AFTER login
+      }
+    });
+  };
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
@@ -24,5 +28,5 @@ export default function Login() {
         Log in with Spotify
       </button>
     </main>
-  )
+  );
 }
