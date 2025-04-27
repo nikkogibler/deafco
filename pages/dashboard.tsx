@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 
 export default function Dashboard() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -19,6 +20,7 @@ export default function Dashboard() {
       if (sessionError) {
         console.error('❌ Error getting session:', sessionError);
         alert('Failed to get Supabase session.');
+        setLoading(false);
         return;
       }
 
@@ -30,8 +32,10 @@ export default function Dashboard() {
         return;
       }
 
+      // Always set the email for UI
       setUserEmail(user.email);
 
+      // Check if user already exists
       const { data, error } = await supabase
         .from('users')
         .select('id')
@@ -40,31 +44,32 @@ export default function Dashboard() {
 
       console.log('🔍 Fetch result:', { data, error });
 
+      // If user not found and no error, insert
       if (!data && !error) {
         console.log('📥 Inserting new user...');
         const { error: insertError } = await supabase.from('users').insert([
           {
-            id: user.id as unknown as string,
+            id: user.id,
             email: user.email,
             role: 'freemium',
           },
         ]);
 
-       if (insertError) {
-  console.error('🔥 INSERT ERROR:', insertError.message || insertError);
-  alert('Error inserting user: ' + (insertError.message || insertError));
-} else {
-  console.log('✅ User inserted successfully');
-  alert('User inserted into Supabase!');
-  setUserEmail(user.email); // ✅ This makes the dashboard show up
-}
-
+        if (insertError) {
+          console.error('🔥 INSERT ERROR:', insertError.message || insertError);
+          alert('Error inserting user: ' + (insertError.message || insertError));
+        } else {
+          console.log('✅ User inserted successfully');
+          alert('User inserted into Supabase!');
+        }
       } else if (error) {
         console.error('❌ Error fetching user:', error);
         alert('Error checking user: ' + error.message);
       } else {
         console.log('✅ User already exists:', data);
       }
+
+      setLoading(false);
     };
 
     checkAndInsertUser();
@@ -74,6 +79,14 @@ export default function Dashboard() {
     await supabase.auth.signOut();
     router.push('/login');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading session...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center">
@@ -89,7 +102,7 @@ export default function Dashboard() {
           </button>
         </>
       ) : (
-        <p>Loading session...</p>
+        <p>Something went wrong — no user email.</p>
       )}
     </div>
   );
