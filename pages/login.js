@@ -34,7 +34,7 @@ export default function Login() {
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
-        redirectTo: 'https://deafco.vercel.app'
+        redirectTo: 'https://deafco.vercel.app/dashboard'
       }
     });
   };
