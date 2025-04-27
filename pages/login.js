@@ -4,38 +4,42 @@ import supabase from '../lib/supabaseClient';
 
 export default function Login() {
   const router = useRouter();
-  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Runs once on load
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) {
-        router.push('/dashboard');
-      } else {
-        setCheckingAuth(false);
-      }
-    });
-
-    // Also watch for new sessions (after redirect from Spotify)
+    // Listen for auth state changes after OAuth redirect
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        console.log('Redirecting to dashboard from auth state change...');
         router.push('/dashboard');
+      } else {
+        setIsReady(true); // show login button
       }
     });
 
-    return () => listener?.subscription?.unsubscribe();
+    // In case the user already has a session stored
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user) {
+        console.log('Session already exists — redirecting...');
+        router.push('/dashboard');
+      } else {
+        setIsReady(true);
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   const handleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
-        redirectTo: 'https://deafco.vercel.app/dashboard'
+        redirectTo: 'https://deafco.vercel.app/login' // important: go back to /login
       }
     });
   };
 
-  if (checkingAuth) return <p>Checking login...</p>;
+  if (!isReady) return <p>Loading...</p>;
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
