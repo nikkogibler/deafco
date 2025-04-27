@@ -11,13 +11,26 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
+    // 💣 Emergency fallback timeout
+    const timeout = setTimeout(() => {
+      console.warn('⚠️ Fallback: loading took too long. Forcing UI.');
+      setLoading(false);
+    }, 8000);
+
     const checkAndInsertUser = async () => {
       try {
         const result = await supabase.auth.getSession();
+        console.log('⚙️ Supabase session fetch result:', result);
+
         const session = result?.data?.session;
         const sessionError = result?.error;
 
+        console.log('📦 session:', session);
+        console.log('🧨 sessionError:', sessionError);
+
         if (sessionError || !session?.user) {
+          console.warn('🚫 No valid session found. Redirecting to /login');
+          await supabase.auth.signOut();
           router.push('/login');
           return;
         }
@@ -56,8 +69,9 @@ export default function Dashboard() {
           await fetchDevices(token);
         }
       } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('🔥 Unexpected crash in checkAndInsertUser:', err);
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
       }
     };
@@ -65,7 +79,6 @@ export default function Dashboard() {
     checkAndInsertUser();
   }, [router]);
 
-  // 🔊 Fetch Now Playing Track
   const fetchNowPlaying = async (token: string) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
@@ -87,7 +100,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🎛 Fetch Available Devices
   const fetchDevices = async (token: string) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
@@ -105,7 +117,6 @@ export default function Dashboard() {
     }
   };
 
-  // 🔁 Transfer Playback to Selected Device
   const transferPlayback = async (deviceId: string) => {
     if (!accessToken) return;
     try {
@@ -139,8 +150,18 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Loading session...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <p className="text-lg">Loading session...</p>
+        {/* TEMPORARY DEBUG BUTTON */}
+        <button
+          onClick={async () => {
+            await supabase.auth.signOut();
+            window.location.reload();
+          }}
+          className="mt-4 text-sm text-red-600 underline"
+        >
+          Clear session (debug)
+        </button>
       </div>
     );
   }
