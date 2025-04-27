@@ -25,10 +25,6 @@ export default function Dashboard() {
       }
 
       const user = session?.user;
-      const accessToken = session?.provider_token;
-const refreshToken = session?.provider_refresh_token;
-console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
-
       if (!user) {
         console.log('🚫 No user found in session');
         alert('No user found — not logged in.');
@@ -36,10 +32,32 @@ console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
         return;
       }
 
-      // Always set the email for UI
       setUserEmail(user.email);
 
-      // Check if user already exists
+      // 🎧 Capture Spotify tokens from session
+      const accessToken = session?.provider_token;
+      const refreshToken = session?.provider_refresh_token;
+      console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
+
+      // 💾 Save tokens into users table
+      if (accessToken && refreshToken) {
+        const { error: tokenUpdateError } = await supabase
+          .from('users')
+          .update({
+            spotify_access_token: accessToken,
+            spotify_refresh_token: refreshToken,
+            token_expires_at: new Date(Date.now() + 3600 * 1000),
+          })
+          .eq('id', user.id);
+
+        if (tokenUpdateError) {
+          console.error('❌ Error updating Spotify tokens:', tokenUpdateError.message);
+        } else {
+          console.log('✅ Spotify tokens saved to user record');
+        }
+      }
+
+      // 🔍 Check if user exists
       const { data, error } = await supabase
         .from('users')
         .select('id')
@@ -48,7 +66,7 @@ console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
 
       console.log('🔍 Fetch result:', { data, error });
 
-      // If user not found and no error, insert
+      // 📥 Insert if not found
       if (!data && !error) {
         console.log('📥 Inserting new user...');
         const { error: insertError } = await supabase.from('users').insert([
