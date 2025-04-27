@@ -7,10 +7,12 @@ export default function Login() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data, error } = await supabase.auth.getSession();
 
-      if (data?.user) {
-        // Already logged in — send to dashboard
+      console.log('Session:', data?.session);
+      console.log('Error:', error);
+
+      if (data?.session?.user) {
         router.push('/dashboard');
       }
     };
@@ -22,7 +24,7 @@ export default function Login() {
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
-        redirectTo: 'https://deafco.vercel.app'
+        redirectTo: 'https://deafco.vercel.app' // must match Supabase site URL
       }
     });
   };
