@@ -46,11 +46,14 @@ export default function Dashboard() {
           },
         ]);
 
-        if (insertError) {
-          console.error('Error inserting user:', insertError);
-        } else {
-          console.log('User inserted successfully');
-        }
+       if (insertError) {
+  console.error('🔥 INSERT ERROR:', insertError.message || insertError);
+  alert('Error inserting user: ' + (insertError.message || insertError));
+} else {
+  console.log('✅ User inserted successfully');
+  alert('User inserted into Supabase!');
+}
+
       } else if (error) {
         console.error('Error fetching user:', error);
       } else {
