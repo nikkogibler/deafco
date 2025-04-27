@@ -25,7 +25,7 @@ export default function Dashboard() {
         const user = session.user;
         setUserEmail(user.email);
 
-        // Upsert user
+        // Insert or update user
         const { error: updateError } = await supabase
           .from('users')
           .update({ email: user.email, role: 'freemium' })
@@ -62,50 +62,50 @@ export default function Dashboard() {
       }
     };
 
-    const fetchNowPlaying = async (token: string) => {
-      try {
-        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.status === 204) {
-          setNowPlaying(null);
-        } else if (res.ok) {
-          const data = await res.json();
-          setNowPlaying(data);
-        } else {
-          console.warn('Now playing fetch failed:', res.status);
-        }
-      } catch (err) {
-        console.error('Now playing error:', err);
-      }
-    };
-
-    const fetchDevices = async (token: string) => {
-      try {
-        const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setDevices(data.devices);
-        } else {
-          console.warn('Device fetch failed:', res.status);
-        }
-      } catch (err) {
-        console.error('Device fetch error:', err);
-      }
-    };
-
     checkAndInsertUser();
   }, [router]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+  // 🔊 Fetch Now Playing Track
+  const fetchNowPlaying = async (token: string) => {
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 204) {
+        console.log('🟡 Nothing currently playing');
+        setNowPlaying(null);
+      } else if (res.ok) {
+        const data = await res.json();
+        console.log('🎶 Now Playing:', data);
+        setNowPlaying(data);
+      } else {
+        console.warn('⚠️ Now playing fetch failed:', res.status);
+      }
+    } catch (err) {
+      console.error('💥 fetchNowPlaying error:', err);
+    }
   };
 
+  // 🎛 Fetch Available Devices
+  const fetchDevices = async (token: string) => {
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setDevices(data.devices);
+      } else {
+        console.warn('⚠️ Device fetch failed:', res.status);
+      }
+    } catch (err) {
+      console.error('💥 fetchDevices error:', err);
+    }
+  };
+
+  // 🔁 Transfer Playback to Selected Device
   const transferPlayback = async (deviceId: string) => {
     if (!accessToken) return;
     try {
@@ -123,13 +123,18 @@ export default function Dashboard() {
 
       if (res.ok) {
         console.log('✅ Playback transferred to:', deviceId);
-        await fetchNowPlaying(accessToken); // refresh now playing
+        await fetchNowPlaying(accessToken);
       } else {
-        console.warn('Failed to transfer playback:', res.status);
+        console.warn('❌ Failed to transfer playback:', res.status);
       }
     } catch (err) {
-      console.error('Transfer playback error:', err);
+      console.error('💥 transferPlayback error:', err);
     }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
   };
 
   if (loading) {
