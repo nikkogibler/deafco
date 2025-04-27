@@ -50,13 +50,15 @@ export default function Dashboard() {
           },
         ]);
 
-        if (insertError) {
-          console.error('🔥 INSERT ERROR:', insertError.message || insertError);
-          alert('Error inserting user: ' + (insertError.message || insertError));
-        } else {
-          console.log('✅ User inserted successfully');
-          alert('User inserted into Supabase!');
-        }
+       if (insertError) {
+  console.error('🔥 INSERT ERROR:', insertError.message || insertError);
+  alert('Error inserting user: ' + (insertError.message || insertError));
+} else {
+  console.log('✅ User inserted successfully');
+  alert('User inserted into Supabase!');
+  setUserEmail(user.email); // ✅ This makes the dashboard show up
+}
+
       } else if (error) {
         console.error('❌ Error fetching user:', error);
         alert('Error checking user: ' + error.message);
