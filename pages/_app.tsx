@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { AppProps } from 'next/app';
-import { supabase } from '@/lib/supabaseClient'; // adjust if needed
+import supabase from '@/lib/supabaseClient'; // 
+
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   useEffect(() => {
