@@ -34,17 +34,17 @@ export default function Dashboard() {
 
       setUserEmail(user.email);
 
-      // 🔍 Check if user exists
-      const { data, error } = await supabase
+      // 1. Check if user already exists
+      const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('id')
         .eq('id', user.id)
         .maybeSingle();
 
-      console.log('🔍 Fetch result:', { data, error });
+      console.log('🔍 User fetch result:', { existingUser, fetchError });
 
-      // 📥 Insert if not found
-      if (!data && !error) {
+      // 2. Insert only if no existing user AND no fetch error
+      if (!existingUser && !fetchError) {
         console.log('📥 Inserting new user...');
         const { error: insertError } = await supabase.from('users').insert([
           {
@@ -59,16 +59,12 @@ export default function Dashboard() {
           alert('Error inserting user: ' + (insertError.message || insertError));
         } else {
           console.log('✅ User inserted successfully');
-          alert('User inserted into Supabase!');
         }
-      } else if (error) {
-        console.error('❌ Error fetching user:', error);
-        alert('Error checking user: ' + error.message);
       } else {
-        console.log('✅ User already exists:', data);
+        console.log('✅ Skipping insert: user already exists or error on fetch');
       }
 
-      // 🎧 Save Spotify tokens AFTER ensuring the user exists
+      // 3. Capture Spotify tokens and update user
       const accessToken = session?.provider_token;
       const refreshToken = session?.provider_refresh_token;
       console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
@@ -90,6 +86,7 @@ export default function Dashboard() {
         }
       }
 
+      console.log('🛑 Done — setLoading(false)');
       setLoading(false);
     };
 
