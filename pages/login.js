@@ -4,28 +4,33 @@ import supabase from '../lib/supabaseClient';
 
 export default function Login() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true); // NEW
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
+  // Watch for live auth changes (esp. after Spotify login)
   useEffect(() => {
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      const session = data?.session;
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (session?.user) {
+          router.push('/dashboard');
+        } else {
+          setCheckingAuth(false); // No session? Show login button
+        }
+      }
+    );
 
-      console.log('Session:', session);
-      console.log('Error:', error);
-
-      if (session?.user) {
+    // Run once on mount too
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session?.user) {
         router.push('/dashboard');
       } else {
-        setLoading(false); // Allow login button to show
+        setCheckingAuth(false);
       }
-    };
+    });
 
-    checkSession();
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
   const handleLogin = async () => {
-    console.log('Logging in...');
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
@@ -34,7 +39,7 @@ export default function Login() {
     });
   };
 
-  if (loading) return <p>Loading auth...</p>;
+  if (checkingAuth) return <p>Checking login status…</p>;
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
