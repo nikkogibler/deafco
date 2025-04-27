@@ -145,7 +145,10 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
   await supabase.auth.signOut();
-  window.location.href = '/login'; // full page reload
+  localStorage.clear();
+  sessionStorage.clear();
+  document.cookie = '';
+  window.location.href = '/login';
 };
 
 
