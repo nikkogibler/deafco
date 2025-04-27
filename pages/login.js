@@ -1,19 +1,23 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
 export default function Login() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true); // NEW
 
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
+      const session = data?.session;
 
-      console.log('Session:', data?.session);
+      console.log('Session:', session);
       console.log('Error:', error);
 
-      if (data?.session?.user) {
+      if (session?.user) {
         router.push('/dashboard');
+      } else {
+        setLoading(false); // Allow login button to show
       }
     };
 
@@ -21,13 +25,16 @@ export default function Login() {
   }, []);
 
   const handleLogin = async () => {
+    console.log('Logging in...');
     await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
-        redirectTo: 'https://deafco.vercel.app' // must match Supabase site URL
+        redirectTo: 'https://deafco.vercel.app'
       }
     });
   };
+
+  if (loading) return <p>Loading auth...</p>;
 
   return (
     <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
