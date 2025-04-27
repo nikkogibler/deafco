@@ -29,11 +29,15 @@ export default function Dashboard() {
         console.log('🧨 sessionError:', sessionError);
 
         if (sessionError || !session?.user) {
-          console.warn('🚫 No valid session found. Redirecting to /login');
-          await supabase.auth.signOut();
-          router.push('/login');
-          return;
-        }
+  console.warn('🚫 No valid session found. Forcing logout and reload');
+  await supabase.auth.signOut();
+  localStorage.clear();
+  sessionStorage.clear();
+  document.cookie = '';
+  window.location.href = '/login';
+  return;
+}
+
 
         const user = session.user;
         setUserEmail(user.email);
