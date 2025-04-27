@@ -33,11 +33,13 @@ export default function Dashboard() {
         .eq('id', user.id)
         .single();
 
+      console.log('Fetch result:', { data, error });
+
       if (!data && !error) {
         console.log('Inserting new user...');
         const { error: insertError } = await supabase.from('users').insert([
           {
-            id: user.id,
+            id: user.id as unknown as string, // force ID to correct shape
             email: user.email,
             role: 'freemium',
           },
@@ -45,6 +47,8 @@ export default function Dashboard() {
 
         if (insertError) {
           console.error('Error inserting user:', insertError);
+        } else {
+          console.log('User inserted successfully');
         }
       } else if (error) {
         console.error('Error fetching user:', error);
