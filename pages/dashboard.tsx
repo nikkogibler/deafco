@@ -159,7 +159,7 @@ export default function Dashboard() {
             await supabase.auth.signOut();
             window.location.reload();
           }}
-          className="mt-4 text-sm text-red-600 underline"
+          className="text-xs text-red-500 underline mt-4"
         >
           Clear session (debug)
         </button>
