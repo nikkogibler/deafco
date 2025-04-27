@@ -11,33 +11,34 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    // 💣 Emergency fallback timeout
     const timeout = setTimeout(() => {
-      console.warn('⚠️ Fallback: loading took too long. Forcing UI.');
+      console.warn('⚠️ Fallback timeout: forcing UI load');
       setLoading(false);
     }, 8000);
 
     const checkAndInsertUser = async () => {
+      console.log('🔁 checkAndInsertUser running...');
+
       try {
         const result = await supabase.auth.getSession();
-        console.log('⚙️ Supabase session fetch result:', result);
+        console.log('🎯 getSession() result:', result);
 
         const session = result?.data?.session;
         const sessionError = result?.error;
 
         console.log('📦 session:', session);
         console.log('🧨 sessionError:', sessionError);
+        console.log('🧐 Checking session validity...');
 
         if (sessionError || !session?.user) {
-  console.warn('🚫 No valid session found. Forcing logout and reload');
-  await supabase.auth.signOut();
-  localStorage.clear();
-  sessionStorage.clear();
-  document.cookie = '';
-  window.location.href = '/login';
-  return;
-}
-
+          console.warn('🚫 No valid session found — forcing sign out and redirect');
+          await supabase.auth.signOut();
+          localStorage.clear();
+          sessionStorage.clear();
+          document.cookie = '';
+          window.location.href = '/login';
+          return;
+        }
 
         const user = session.user;
         setUserEmail(user.email);
@@ -58,7 +59,7 @@ export default function Dashboard() {
           ]);
         }
 
-        // Fetch Spotify token
+        // Get token
         const { data: userData } = await supabase
           .from('users')
           .select('spotify_access_token')
@@ -73,8 +74,9 @@ export default function Dashboard() {
           await fetchDevices(token);
         }
       } catch (err) {
-        console.error('🔥 Unexpected crash in checkAndInsertUser:', err);
+        console.error('🔥 Unexpected error in checkAndInsertUser:', err);
       } finally {
+        console.log('✅ Finished — setLoading(false)');
         clearTimeout(timeout);
         setLoading(false);
       }
@@ -148,33 +150,31 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-  await supabase.auth.signOut();
-  localStorage.clear();
-  sessionStorage.clear();
-  document.cookie = '';
-  window.location.href = '/login';
-};
+    await supabase.auth.signOut();
+    localStorage.clear();
+    sessionStorage.clear();
+    document.cookie = '';
+    window.location.href = '/login';
+  };
 
+  const track = nowPlaying?.item;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
+      <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
         <p className="text-lg">Loading session...</p>
-        {/* TEMPORARY DEBUG BUTTON */}
         <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            window.location.reload();
+          onClick={() => {
+            console.warn('🛑 Force disabling loading...');
+            setLoading(false);
           }}
-          className="text-xs text-red-500 underline mt-4"
+          className="mt-4 text-sm text-blue-600 underline"
         >
-          Clear session (debug)
+          Force exit loading state
         </button>
       </div>
     );
   }
-
-  const track = nowPlaying?.item;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
