@@ -34,37 +34,26 @@ export default function Dashboard() {
 
       setUserEmail(user.email);
 
-      // 1. Check if user already exists
-      const { data: existingUser, error: fetchError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      console.log('🔍 User fetch result:', { existingUser, fetchError });
-
-      // 2. Insert only if no existing user AND no fetch error
-      if (!existingUser && !fetchError) {
-        console.log('📥 Inserting new user...');
-        const { error: insertError } = await supabase.from('users').insert([
+      // 📥 Run upsert to avoid duplicate key errors
+      console.log('📥 Running upsert instead of insert...');
+      const { error: upsertError } = await supabase.from('users')
+        .upsert(
           {
             id: user.id,
             email: user.email,
             role: 'freemium',
           },
-        ]);
+          { onConflict: 'id' }
+        );
 
-        if (insertError) {
-          console.error('🔥 INSERT ERROR:', insertError.message || insertError);
-          alert('Error inserting user: ' + (insertError.message || insertError));
-        } else {
-          console.log('✅ User inserted successfully');
-        }
+      if (upsertError) {
+        console.error('🔥 UPSERT ERROR:', upsertError.message || upsertError);
+        alert('Error upserting user: ' + (upsertError.message || upsertError));
       } else {
-        console.log('✅ Skipping insert: user already exists or error on fetch');
+        console.log('✅ User upserted successfully');
       }
 
-      // 3. Capture Spotify tokens and update user
+      // 🎧 Save Spotify tokens
       const accessToken = session?.provider_token;
       const refreshToken = session?.provider_refresh_token;
       console.log('🎧 Spotify Tokens:', { accessToken, refreshToken });
