@@ -36,7 +36,7 @@ export default function Dashboard() {
         .from('users')
         .select('id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       console.log('🔍 Fetch result:', { data, error });
 
