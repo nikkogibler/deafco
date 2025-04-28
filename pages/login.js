@@ -1,61 +1,64 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react'
+import { useSupabaseClient } from '@supabase/auth-helpers-react'
 
 export default function Login() {
   const router = useRouter()
-  const session = useSession()
   const supabase = useSupabaseClient()
 
   useEffect(() => {
-    const handleSpotifyCallback = async () => {
-      // Capture hash parameters from the URL
+    const handleAuthFlow = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
       const expiresIn = hashParams.get('expires_in')
 
-      // ⭐ INSERT REDIRECT HERE ⭐
-      if (!accessToken && session?.user) {
-        console.log('No Spotify token found. Redirecting to Spotify login...')
+      if (accessToken) {
+        console.log('Captured Spotify tokens. Saving...')
 
-        const clientId = 'YOUR_SPOTIFY_CLIENT_ID' // <-- replace this
-        const redirectUri = encodeURIComponent('https://your-app.vercel.app/login') // <-- replace this
+        // Try to get Supabase session user info (if available)
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+        if (userError) {
+          console.error('Error fetching Supabase user:', userError.message)
+        }
+
+        if (user) {
+          console.log('Supabase user exists. Saving Spotify tokens.')
+
+          const { error } = await supabase
+            .from('users')
+            .upsert({
+              id: user.id,
+              spotify_access_token: accessToken,
+              spotify_refresh_token: refreshToken,
+              token_expires_at: Math.floor(Date.now() / 1000) + Number(expiresIn),
+            }, { onConflict: 'id' })
+
+          if (error) {
+            console.error('Error saving Spotify tokens to Supabase:', error.message)
+            alert('Problem saving your Spotify login. Please try again.')
+            return
+          }
+
+          router.push('/dashboard')
+        } else {
+          console.warn('No Supabase user session. Proceeding anyway.')
+          // You might choose to push to dashboard or reinitiate supabase.auth.refreshSession()
+          router.push('/dashboard')
+        }
+      } else {
+        console.log('No access token. Redirecting to Spotify login.')
+        const clientId = 'YOUR_SPOTIFY_CLIENT_ID'
+        const redirectUri = encodeURIComponent('https://deafco.vercel.app/login')
         const scopes = encodeURIComponent('user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state')
 
         window.location.href = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}`
-        return // Important: stop execution after redirect
-      }
-
-      // ✅ Capture tokens if present
-      if (accessToken && session?.user) {
-        console.log('Captured Spotify tokens, updating Supabase...')
-
-        const { error } = await supabase
-          .from('users')
-          .upsert({
-            spotify_access_token: accessToken,
-            spotify_refresh_token: refreshToken,
-            token_expires_at: Math.floor(Date.now() / 1000) + Number(expiresIn),
-          })
-          .eq('id', session.user.id)
-
-        if (error) {
-          console.error('Error updating user with Spotify tokens:', error.message)
-          alert('Could not save your Spotify login. Please try again.')
-          return
-        }
-
-        // Tokens saved successfully → Redirect to dashboard
-        router.push('/dashboard')
       }
     }
 
-    // Only run this if session exists
-    if (session) {
-      handleSpotifyCallback()
-    }
-  }, [session, supabase, router])
+    handleAuthFlow()
+  }, [supabase, router])
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
