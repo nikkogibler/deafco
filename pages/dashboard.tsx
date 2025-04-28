@@ -55,6 +55,8 @@ export default function Dashboard() {
           body: JSON.stringify({ refresh_token: refreshToken }),
         }).then(r => r.json())
 
+        console.log('🆕 Refreshed token response:', refreshed)
+
         if (refreshed.access_token) {
           await supabase
             .from('users')
