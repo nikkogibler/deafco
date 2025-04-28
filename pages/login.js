@@ -49,7 +49,7 @@ export default function Login() {
         }
       } else {
         console.log('No access token. Redirecting to Spotify login.')
-        const clientId = 'YOUR_SPOTIFY_CLIENT_ID'
+        const clientId = 'f2a8dfe8bd764c32a3b2f71b1d271ed9'
         const redirectUri = encodeURIComponent('https://deafco.vercel.app/login')
         const scopes = encodeURIComponent('user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state')
 
