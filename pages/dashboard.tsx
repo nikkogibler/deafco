@@ -2,25 +2,28 @@
 
 import { useEffect, useState } from 'react'
 import supabase from '@/utils/supabaseClient'
-import { useRouter } from 'next/router'
 
 export default function Dashboard() {
-  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [nowPlaying, setNowPlaying] = useState<any | null>(null)
   const [devices, setDevices] = useState<any[]>([])
   const [accessToken, setAccessToken] = useState<string | null>(null)
-  const router = useRouter()
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: session, error } = await supabase.auth.getSession()
-      if (error || !session.session?.user) {
+      const { data, error } = await supabase.auth.getSession()
+
+      console.log('🧠 Session:', data)
+      console.log('⚠️ Error:', error)
+
+      if (!data?.session?.user) {
+        console.warn('🚪 No user session — logging out')
         window.location.href = '/login'
         return
       }
 
-      const user = session.session.user
+      const user = data.session.user
       setUserEmail(user.email)
 
       const { data: userData } = await supabase
@@ -33,27 +36,32 @@ export default function Dashboard() {
       const refreshToken = userData?.spotify_refresh_token
       setAccessToken(token)
 
-      if (!token) return
+      if (!token) {
+        console.warn('❌ No Spotify token found')
+        setLoading(false)
+        return
+      }
 
-      const valid = await fetch('https://api.spotify.com/v1/me', {
+      const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      if (valid.status === 401 && refreshToken) {
+      if (res.status === 401 && refreshToken) {
+        console.log('🔁 Token expired, refreshing...')
+
         const refreshed = await fetch('/api/refresh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),
-        }).then((r) => r.json())
+        }).then(r => r.json())
 
         if (refreshed.access_token) {
-          setAccessToken(refreshed.access_token)
-
           await supabase
             .from('users')
             .update({ spotify_access_token: refreshed.access_token })
             .eq('id', user.id)
 
+          setAccessToken(refreshed.access_token)
           await fetchNowPlaying(refreshed.access_token)
           await fetchDevices(refreshed.access_token)
         }
@@ -69,23 +77,37 @@ export default function Dashboard() {
   }, [])
 
   const fetchNowPlaying = async (token: string) => {
-    const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.ok && res.status !== 204) {
-      const data = await res.json()
-      setNowPlaying(data)
-    } else {
-      setNowPlaying(null)
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      console.log('🎧 Now Playing status:', res.status)
+
+      if (res.ok && res.status !== 204) {
+        const data = await res.json()
+        console.log('📦 Now Playing data:', data)
+        setNowPlaying(data)
+      } else {
+        setNowPlaying(null)
+      }
+    } catch (err) {
+      console.error('💥 fetchNowPlaying error:', err)
     }
   }
 
   const fetchDevices = async (token: string) => {
-    const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    const data = await res.json()
-    setDevices(data.devices || [])
+    try {
+      const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      const data = await res.json()
+      console.log('📱 Devices:', data)
+      setDevices(data.devices || [])
+    } catch (err) {
+      console.error('💥 fetchDevices error:', err)
+    }
   }
 
   const handleLogout = async () => {
@@ -96,10 +118,8 @@ export default function Dashboard() {
     window.location.href = '/login'
   }
 
-  const track = nowPlaying?.item
-
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-center px-4">Loading your vibe...</div>
+    return <div className="min-h-screen flex items-center justify-center">Loading your vibe...</div>
   }
 
   return (
@@ -118,19 +138,19 @@ export default function Dashboard() {
         </>
       )}
 
-      {track ? (
+      {nowPlaying?.item ? (
         <div className="mb-10">
           <h2 className="text-xl font-semibold">Now Playing:</h2>
-          <p className="mt-2 font-medium">{track.name}</p>
-          <p className="text-sm text-gray-600">{track.artists?.[0]?.name}</p>
+          <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
+          <p className="text-sm text-gray-600">{nowPlaying.item.artists?.[0]?.name}</p>
           <img
-            src={track.album?.images?.[0]?.url}
+            src={nowPlaying.item.album?.images?.[0]?.url}
             alt="Album Cover"
             className="w-48 h-48 mt-4 rounded-lg shadow-lg"
           />
         </div>
       ) : (
-        <p className="text-gray-600 mb-6">No track currently playing.</p>
+        <p className="text-gray-500 mb-6">No track currently playing.</p>
       )}
 
       <div className="w-full max-w-md">
