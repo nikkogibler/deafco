@@ -1,43 +1,45 @@
-import { useEffect, useState } from 'react';
-import supabase from '@/lib/supabaseClient';
-import { useRouter } from 'next/router';
+'use client'
+
+import { useEffect, useState } from 'react'
+import supabase from '@/lib/supabaseClient'
+import { useRouter } from 'next/router'
 
 export default function Dashboard() {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [nowPlaying, setNowPlaying] = useState<any | null>(null);
-  const [devices, setDevices] = useState<any[] | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [nowPlaying, setNowPlaying] = useState<any | null>(null)
+  const [devices, setDevices] = useState<any[]>([])
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.warn('⏱️ Fallback timeout triggered');
-      setLoading(false);
-    }, 8000);
+      console.warn('⏱️ Fallback timeout triggered')
+      setLoading(false)
+    }, 8000)
 
     const checkAndInsertUser = async () => {
-      console.log('🔁 checkAndInsertUser running...');
+      console.log('🔁 checkAndInsertUser running...')
 
       try {
-        const result = await supabase.auth.getSession();
-        const session = result?.data?.session;
-        const sessionError = result?.error;
+        const result = await supabase.auth.getSession()
+        const session = result?.data?.session
+        const sessionError = result?.error
 
-        console.log('📦 session:', session);
+        console.log('📦 session:', session)
 
         if (sessionError || !session?.user) {
-          console.warn('🚫 Invalid session — forcing logout');
-          await supabase.auth.signOut();
-          localStorage.clear();
-          sessionStorage.clear();
-          document.cookie = '';
-          window.location.href = '/login';
-          return;
+          console.warn('🚫 Invalid session — forcing logout')
+          await supabase.auth.signOut()
+          localStorage.clear()
+          sessionStorage.clear()
+          document.cookie = ''
+          window.location.href = '/login'
+          return
         }
 
-        const user = session.user;
-        setUserEmail(user.email);
+        const user = session.user
+        setUserEmail(user.email)
 
         const { error: upsertError } = await supabase.from('users').upsert(
           {
@@ -49,80 +51,111 @@ export default function Dashboard() {
             token_expires_at: new Date(Date.now() + 3600 * 1000),
           },
           { onConflict: 'id' }
-        );
+        )
 
         if (upsertError) {
-          console.error('🛑 Error upserting user:', upsertError.message);
+          console.error('🛑 Error upserting user:', upsertError.message)
         } else {
-          console.log('✅ User upserted with tokens');
+          console.log('✅ User upserted with tokens')
         }
 
         const { data: userData, error: tokenFetchError } = await supabase
           .from('users')
-          .select('spotify_access_token')
+          .select('spotify_access_token, spotify_refresh_token')
           .eq('id', user.id)
-          .single();
+          .single()
 
         if (tokenFetchError) {
-          console.error('🔐 Token fetch error:', tokenFetchError.message);
+          console.error('🔐 Token fetch error:', tokenFetchError.message)
         }
 
-        const token = userData?.spotify_access_token;
-        setAccessToken(token);
+        const token = userData?.spotify_access_token
+        const refreshToken = userData?.spotify_refresh_token
+        setAccessToken(token)
 
         if (token) {
-          await fetchNowPlaying(token);
-          await fetchDevices(token);
+          const valid = await fetch('https://api.spotify.com/v1/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+
+          if (valid.status === 401 && refreshToken) {
+            console.log('🔁 Access token expired, trying refresh...')
+
+            const refreshResponse = await fetch('/api/refresh', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refresh_token: refreshToken }),
+            })
+
+            const refreshed = await refreshResponse.json()
+            if (refreshed.access_token) {
+              console.log('✅ Refreshed token:', refreshed.access_token)
+              setAccessToken(refreshed.access_token)
+
+              await supabase.from('users').update({
+                spotify_access_token: refreshed.access_token,
+                token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000),
+              }).eq('id', user.id)
+
+              await fetchNowPlaying(refreshed.access_token)
+              await fetchDevices(refreshed.access_token)
+            } else {
+              console.warn('❌ Failed to refresh token')
+            }
+          } else {
+            await fetchNowPlaying(token)
+            await fetchDevices(token)
+          }
         } else {
-          console.warn('⚠️ No Spotify token found — skipping playback fetch');
+          console.warn('⚠️ No Spotify token found — skipping playback fetch')
         }
       } catch (err) {
-        console.error('🔥 Unexpected error in checkAndInsertUser:', err);
+        console.error('🔥 Unexpected error in checkAndInsertUser:', err)
       } finally {
-        clearTimeout(timeout);
-        setLoading(false);
+        clearTimeout(timeout)
+        setLoading(false)
       }
-    };
+    }
 
-    checkAndInsertUser();
-  }, [router]);
+    checkAndInsertUser()
+  }, [router])
 
   const fetchNowPlaying = async (token: string) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: { Authorization: `Bearer ${token}` },
-      });
+      })
 
-      const raw = await res.text();
-      console.log('🎧 Now Playing status:', res.status);
-      console.log('📦 Raw Now Playing response:', raw);
+      const raw = await res.text()
+      console.log('🎧 Now Playing status:', res.status)
+      console.log('📦 Raw Now Playing response:', raw)
 
       if (res.ok && res.status !== 204) {
-        const data = JSON.parse(raw);
-        setNowPlaying(data);
+        const data = JSON.parse(raw)
+        setNowPlaying(data)
       } else {
-        setNowPlaying(null);
+        setNowPlaying(null)
       }
     } catch (err) {
-      console.error('💥 fetchNowPlaying error:', err);
+      console.error('💥 fetchNowPlaying error:', err)
     }
-  };
+  }
 
   const fetchDevices = async (token: string) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
         headers: { Authorization: `Bearer ${token}` },
-      });
+      })
 
-      const data = await res.json();
-      setDevices(data.devices);
+      const data = await res.json()
+      setDevices(data.devices)
     } catch (err) {
-      console.error('💥 fetchDevices error:', err);
+      console.error('💥 fetchDevices error:', err)
     }
-  };
+  }
 
   const transferPlayback = async (deviceId: string) => {
-    if (!accessToken) return;
+    if (!accessToken) return
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
@@ -131,30 +164,30 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ device_ids: [deviceId], play: true }),
-      });
+      })
 
       if (res.ok) {
-        await fetchNowPlaying(accessToken);
+        await fetchNowPlaying(accessToken)
       } else {
-        console.warn('⚠️ Failed to transfer playback:', res.status);
+        console.warn('⚠️ Failed to transfer playback:', res.status)
       }
     } catch (err) {
-      console.error('💥 transferPlayback error:', err);
+      console.error('💥 transferPlayback error:', err)
     }
-  };
+  }
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut()
     } finally {
-      localStorage.clear();
-      sessionStorage.clear();
-      document.cookie = '';
-      window.location.href = '/login';
+      localStorage.clear()
+      sessionStorage.clear()
+      document.cookie = ''
+      window.location.href = '/login'
     }
-  };
+  }
 
-  const track = nowPlaying?.item;
+  const track = nowPlaying?.item
 
   if (loading) {
     return (
@@ -167,7 +200,7 @@ export default function Dashboard() {
           Force exit loading state
         </button>
       </div>
-    );
+    )
   }
 
   return (
@@ -224,5 +257,5 @@ export default function Dashboard() {
         </div>
       )}
     </div>
-  );
+  )
 }
