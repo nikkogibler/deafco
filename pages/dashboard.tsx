@@ -22,6 +22,7 @@ export default function Dashboard() {
       try {
         const result = await supabase.auth.getSession()
         const session = result?.data?.session
+console.log('📦 session:', session)
 
         if (!session?.user) {
           await supabase.auth.signOut()
