@@ -1,36 +1,16 @@
-import { useEffect } from 'react';
-import type { AppProps } from 'next/app';
-import supabase from '@/lib/supabaseClient'; // 
+import { useState } from 'react'
+import { SessionContextProvider } from '@supabase/auth-helpers-react'
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs'
+import '@/styles/globals.css'
 
+function MyApp({ Component, pageProps }) {
+  const [supabaseClient] = useState(() => createBrowserSupabaseClient())
 
-export default function MyApp({ Component, pageProps }: AppProps) {
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const user = session.user;
-
-        const { data, error } = await supabase
-          .from('users')
-          .select('id')
-          .eq('id', user.id)
-          .single();
-
-        if (!data && !error) {
-          await supabase.from('users').insert([
-            {
-              id: user.id,
-              email: user.email,
-              role: 'freemium',
-            },
-          ]);
-        }
-      }
-    });
-
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
-  }, []);
-
-  return <Component {...pageProps} />;
+  return (
+    <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
+      <Component {...pageProps} />
+    </SessionContextProvider>
+  )
 }
+
+export default MyApp
