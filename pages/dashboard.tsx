@@ -113,12 +113,12 @@ export default function Dashboard() {
       
       {/* SonicSuite Logo at the top center */}
       <div className="absolute top-8">
-        <Image src="/sonicsuite-logo.svg" alt="SonicSuite Logo" width={160} height={40} />
+        <Image src="https://raw.githubusercontent.com/nikkogibler/deafco/refs/heads/main/public/Screen%20Shot%202025-04-28%20at%2012.42.31%20PM.png" alt="SonicSuite Logo" width={160} height={40} />
       </div>
 
       {/* Spotify White Logo at the top-right corner */}
       <div className="absolute top-8 right-8">
-        <Image src="/spotify-white-logo.svg" alt="Spotify" width={40} height={40} />
+        <Image src="https://raw.githubusercontent.com/nikkogibler/deafco/refs/heads/main/public/spotify_logo_transparent_white.png" alt="Spotify" width={40} height={40} />
       </div>
 
       <div className="flex flex-col items-center gap-4">
