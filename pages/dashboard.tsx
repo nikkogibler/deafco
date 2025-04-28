@@ -109,7 +109,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-40 bg-gray-900 text-white">
+    <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-40" style={{ backgroundColor: '#141b24', color: 'white' }}>
+
       
       {/* SonicSuite Logo at the top center */}
       <div className="absolute top-8">
