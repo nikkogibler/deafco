@@ -1,99 +1,86 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useSession } from '@supabase/auth-helpers-react'
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs'
+import { GetServerSidePropsContext } from 'next'
 import supabase from '@/utils/supabaseClient'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 
 export default function Dashboard() {
   const session = useSession()
-  const [nowPlaying, setNowPlaying] = useState(null)
-  const [devices, setDevices] = useState([])
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [accessToken, setAccessToken] = useState(null)
+  const [nowPlaying, setNowPlaying] = useState<any | null>(null)
+  const [devices, setDevices] = useState<any[]>([])
 
   useEffect(() => {
-    if (!session?.user) {
-      window.location.href = '/login'
-      return
-    }
-
-    const loadData = async () => {
-      try {
-        const { data: userRow } = await supabase
-          .from('users')
-          .select('spotify_access_token, spotify_refresh_token')
-          .eq('id', session.user.id)
-          .single()
-
-        const token = userRow?.spotify_access_token
-        const refreshToken = userRow?.spotify_refresh_token
-
-        if (!token) {
-          console.warn('No Spotify token available')
-          return
-        }
-
-        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        if (res.status === 401 && refreshToken) {
-          const refreshed = await fetch('/api/refresh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
-          }).then(r => r.json())
-
-          if (refreshed.access_token) {
-            await supabase.from('users')
-              .update({ spotify_access_token: refreshed.access_token })
-              .eq('id', session.user.id)
-
-            setAccessToken(refreshed.access_token)
-            await fetchNowPlaying(refreshed.access_token)
-            await fetchDevices(refreshed.access_token)
-          }
-        } else {
-          setAccessToken(token)
-          await fetchNowPlaying(token)
-          await fetchDevices(token)
-        }
-      } catch (error) {
-        console.error('Failed to load data', error)
-      } finally {
-        setLoading(false)
+    const fetchSpotify = async () => {
+      if (!session?.user) {
+        router.push('/login')
+        return
       }
-    }
 
-    loadData()
-  }, [session])
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('spotify_access_token, spotify_refresh_token')
+        .eq('id', session.user.id)
+        .single()
 
-  const fetchNowPlaying = async (token) => {
-    try {
+      const token = userRow?.spotify_access_token
+      const refreshToken = userRow?.spotify_refresh_token
+
+      if (!token) return
+
       const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (res.ok && res.status !== 204) {
-        const data = await res.json()
-        setNowPlaying(data)
+
+      if (res.status === 401 && refreshToken) {
+        const refreshed = await fetch('/api/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        }).then((r) => r.json())
+
+        if (refreshed.access_token) {
+          await supabase
+            .from('users')
+            .update({ spotify_access_token: refreshed.access_token })
+            .eq('id', session.user.id)
+
+          await fetchNowPlaying(refreshed.access_token)
+          await fetchDevices(refreshed.access_token)
+        }
       } else {
-        setNowPlaying(null)
+        await fetchNowPlaying(token)
+        await fetchDevices(token)
       }
-    } catch (error) {
-      console.error('Error fetching now playing', error)
+
+      setLoading(false)
+    }
+
+    fetchSpotify()
+  }, [session, router])
+
+  const fetchNowPlaying = async (token: string) => {
+    const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok && res.status !== 204) {
+      const data = await res.json()
+      setNowPlaying(data)
+    } else {
+      setNowPlaying(null)
     }
   }
 
-  const fetchDevices = async (token) => {
-    try {
-      const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      setDevices(data.devices || [])
-    } catch (error) {
-      console.error('Error fetching devices', error)
-    }
+  const fetchDevices = async (token: string) => {
+    const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json()
+    setDevices(data.devices || [])
   }
 
   const handleLogout = async () => {
@@ -109,7 +96,9 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">Loading your vibe...</div>
+      <div className="min-h-screen flex items-center justify-center text-center px-4">
+        <p className="text-lg">Loading your vibe...</p>
+      </div>
     )
   }
 
@@ -120,10 +109,7 @@ export default function Dashboard() {
       {userEmail && (
         <>
           <p className="mb-4">Logged in as: {userEmail}</p>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
-          >
+          <button onClick={handleLogout} className="px-4 py-2 mb-8 bg-black text-white rounded-xl">
             Logout
           </button>
         </>
@@ -160,4 +146,28 @@ export default function Dashboard() {
       </div>
     </div>
   )
+}
+
+// ✅ This gets the session and passes it to _app.tsx so useSession() works
+export async function getServerSideProps(ctx: GetServerSidePropsContext) {
+  const supabase = createServerSupabaseClient(ctx)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    }
+  }
+
+  return {
+    props: {
+      initialSession: session,
+      user: session.user,
+    },
+  }
 }
