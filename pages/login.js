@@ -1,63 +1,49 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import supabase from '../lib/supabaseClient';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 export default function Login() {
   const router = useRouter();
-  const [isReady, setIsReady] = useState(false);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
-    // Listen for auth state changes after OAuth redirect
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
         console.log('Redirecting to dashboard from auth state change...');
         router.push('/dashboard');
-      } else {
-        setIsReady(true); // show login button
       }
     });
 
-    // In case the user already has a session stored
-    supabase.auth.getSession().then(({ data }) => {
-      if (data?.session?.user) {
-        console.log('Session already exists — redirecting...');
-        router.push('/dashboard');
-      } else {
-        setIsReady(true);
-      }
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [router, supabase]);
 
   const handleLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
-        redirectTo: 'https://deafco.vercel.app/login' // important: go back to /login
-      }
+        scopes:
+          'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
+      },
     });
+
+    if (error) {
+      console.error('Error signing in:', error.message);
+    }
   };
 
-  if (!isReady) return <p>Loading...</p>;
-
   return (
-    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>Welcome to SonicSuite 🌊</h1>
-      <button
-        onClick={handleLogin}
-        style={{
-          background: '#1DB954',
-          color: 'white',
-          padding: '1rem 2rem',
-          borderRadius: '5px',
-          border: 'none',
-          fontSize: '1rem',
-          cursor: 'pointer'
-        }}
-      >
-        Log in with Spotify
-      </button>
-    </main>
+    <div className="min-h-screen flex items-center justify-center bg-black text-white">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-6">Login to DeafCo</h1>
+        <button
+          onClick={handleLogin}
+          className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-semibold"
+        >
+          Login with Spotify
+        </button>
+      </div>
+    </div>
   );
 }
