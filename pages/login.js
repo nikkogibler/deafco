@@ -33,7 +33,7 @@ export default function Login() {
 
         const { error } = await supabase
           .from('users')
-          .update({
+          .upsert({
             spotify_access_token: accessToken,
             spotify_refresh_token: refreshToken,
             token_expires_at: Math.floor(Date.now() / 1000) + Number(expiresIn),
