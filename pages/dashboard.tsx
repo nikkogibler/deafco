@@ -141,12 +141,15 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold">Now Playing:</h2>
             <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
             <p className="text-sm text-gray-400">{nowPlaying.item.artists?.[0]?.name}</p>
-            <img
-              src={nowPlaying.item.album?.images?.[0]?.url}
-              alt="Album Cover"
-              className="w-48 h-48 mt-4 rounded-lg shadow-lg"
-            />
-          </div>
+           
+        <div className="flex justify-center">
+  <img
+    src={nowPlaying.item.album?.images?.[0]?.url}
+    alt="Album Cover"
+    className="w-48 h-48 mt-4 rounded-lg shadow-lg"
+  />
+</div>
+
         ) : (
           <p className="text-gray-400 mb-6">No track currently playing.</p>
         )}
