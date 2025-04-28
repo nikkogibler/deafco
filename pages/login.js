@@ -9,15 +9,16 @@ export default function Login() {
 
   useEffect(() => {
     const handleSpotifyCallback = async () => {
+      // Capture hash parameters from the URL
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
-
       const accessToken = hashParams.get('access_token')
       const refreshToken = hashParams.get('refresh_token')
       const expiresIn = hashParams.get('expires_in')
 
-      if (accessToken) {
-        // Update the user in Supabase with Spotify tokens
-        const { data, error } = await supabase
+      if (accessToken && session?.user) {
+        console.log('Captured Spotify tokens, updating Supabase...')
+
+        const { error } = await supabase
           .from('users')
           .update({
             spotify_access_token: accessToken,
@@ -27,16 +28,21 @@ export default function Login() {
           .eq('id', session.user.id)
 
         if (error) {
-          console.error('Error updating Spotify tokens:', error.message)
-          alert('There was a problem saving your Spotify login. Please try again.')
+          console.error('Error updating user with Spotify tokens:', error.message)
+          alert('Could not save your Spotify login. Please try again.')
           return
         }
 
-        // Redirect to dashboard after successful login
+        // Tokens saved successfully → Redirect to dashboard
         router.push('/dashboard')
+      } else if (!accessToken) {
+        console.error('No Spotify access token found in URL.')
+        alert('No Spotify access token found. Please try logging in again.')
+        router.push('/login')
       }
     }
 
+    // Only run this if session exists
     if (session) {
       handleSpotifyCallback()
     }
