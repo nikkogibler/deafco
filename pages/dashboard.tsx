@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import supabase from '@/utils/supabaseClient'
+import Image from 'next/image'
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
@@ -14,11 +15,7 @@ export default function Dashboard() {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession()
 
-      console.log('🧠 Session:', data)
-      console.log('⚠️ Error:', error)
-
       if (!data?.session?.user) {
-        console.warn('🚪 No user session — logging out')
         window.location.href = '/login'
         return
       }
@@ -37,7 +34,6 @@ export default function Dashboard() {
       setAccessToken(token)
 
       if (!token) {
-        console.warn('❌ No Spotify token found')
         setLoading(false)
         return
       }
@@ -47,15 +43,11 @@ export default function Dashboard() {
       })
 
       if (res.status === 401 && refreshToken) {
-        console.log('🔁 Token expired, refreshing...')
-
         const refreshed = await fetch('/api/refresh', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),
         }).then(r => r.json())
-
-console.log('🆕 Refreshed token response:', JSON.stringify(refreshed, null, 2))
 
         if (refreshed.access_token) {
           await supabase
@@ -79,37 +71,25 @@ console.log('🆕 Refreshed token response:', JSON.stringify(refreshed, null, 2)
   }, [])
 
   const fetchNowPlaying = async (token: string) => {
-    try {
-      const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+    const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-      console.log('🎧 Now Playing status:', res.status)
-
-      if (res.ok && res.status !== 204) {
-        const data = await res.json()
-        console.log('📦 Now Playing data:', data)
-        setNowPlaying(data)
-      } else {
-        setNowPlaying(null)
-      }
-    } catch (err) {
-      console.error('💥 fetchNowPlaying error:', err)
+    if (res.ok && res.status !== 204) {
+      const data = await res.json()
+      setNowPlaying(data)
+    } else {
+      setNowPlaying(null)
     }
   }
 
   const fetchDevices = async (token: string) => {
-    try {
-      const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+    const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
 
-      const data = await res.json()
-      console.log('📱 Devices:', data)
-      setDevices(data.devices || [])
-    } catch (err) {
-      console.error('💥 fetchDevices error:', err)
-    }
+    const data = await res.json()
+    setDevices(data.devices || [])
   }
 
   const handleLogout = async () => {
@@ -121,53 +101,70 @@ console.log('🆕 Refreshed token response:', JSON.stringify(refreshed, null, 2)
   }
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading your vibe...</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        Loading your vibe...
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
-      <h1 className="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
+    <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 bg-gray-900 text-white">
+      
+      {/* SonicSuite Logo at the top center */}
+      <div className="absolute top-8">
+        <Image src="/sonicsuite-logo.svg" alt="SonicSuite Logo" width={160} height={40} />
+      </div>
 
-      {userEmail && (
-        <>
-          <p className="mb-4">Logged in as: {userEmail}</p>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
-          >
-            Logout
-          </button>
-        </>
-      )}
+      {/* Spotify White Logo at the top-right corner */}
+      <div className="absolute top-8 right-8">
+        <Image src="/spotify-white-logo.svg" alt="Spotify" width={40} height={40} />
+      </div>
 
-      {nowPlaying?.item ? (
-        <div className="mb-10">
-          <h2 className="text-xl font-semibold">Now Playing:</h2>
-          <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
-          <p className="text-sm text-gray-600">{nowPlaying.item.artists?.[0]?.name}</p>
-          <img
-            src={nowPlaying.item.album?.images?.[0]?.url}
-            alt="Album Cover"
-            className="w-48 h-48 mt-4 rounded-lg shadow-lg"
-          />
-        </div>
-      ) : (
-        <p className="text-gray-500 mb-6">No track currently playing.</p>
-      )}
+      <div className="flex flex-col items-center gap-4">
+        <h1 className="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
 
-      <div className="w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
-        {devices.length === 0 ? (
-          <p className="text-gray-500">No active Spotify devices found.</p>
-        ) : (
-          <ul className="space-y-2">
-            {devices.map((device) => (
-              <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
-                <span>{device.name} {device.is_active && '✅'}</span>
-              </li>
-            ))}
-          </ul>
+        {userEmail && (
+          <>
+            <p className="mb-4">Logged in as: {userEmail}</p>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
+            >
+              Logout
+            </button>
+          </>
         )}
+
+        {nowPlaying?.item ? (
+          <div className="mb-10">
+            <h2 className="text-xl font-semibold">Now Playing:</h2>
+            <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
+            <p className="text-sm text-gray-400">{nowPlaying.item.artists?.[0]?.name}</p>
+            <img
+              src={nowPlaying.item.album?.images?.[0]?.url}
+              alt="Album Cover"
+              className="w-48 h-48 mt-4 rounded-lg shadow-lg"
+            />
+          </div>
+        ) : (
+          <p className="text-gray-400 mb-6">No track currently playing.</p>
+        )}
+
+        <div className="w-full max-w-md">
+          <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
+          {devices.length === 0 ? (
+            <p className="text-gray-400">No active Spotify devices found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {devices.map(device => (
+                <li key={device.id} className="flex justify-between items-center border border-gray-700 p-2 rounded-md">
+                  <span>{device.name} {device.is_active && '✅'}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )
