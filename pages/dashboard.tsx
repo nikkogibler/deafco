@@ -1,147 +1,98 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSession } from '@supabase/auth-helpers-react'
 import supabase from '@/utils/supabaseClient'
-import { useRouter } from 'next/router'
 
 export default function Dashboard() {
-  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const session = useSession()
+  const [nowPlaying, setNowPlaying] = useState(null)
+  const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
-  const [nowPlaying, setNowPlaying] = useState<any | null>(null)
-  const [devices, setDevices] = useState<any[]>([])
-  const [accessToken, setAccessToken] = useState<string | null>(null)
-  const router = useRouter()
+  const [accessToken, setAccessToken] = useState(null)
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      console.warn('⏱️ Fallback timeout triggered')
-      setLoading(false)
-    }, 8000)
+    if (!session?.user) {
+      window.location.href = '/login'
+      return
+    }
 
-    const checkAndInsertUser = async () => {
+    const loadData = async () => {
       try {
-        const result = await supabase.auth.getSession()
-        const session = result?.data?.session
-console.log('📦 session:', session)
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('spotify_access_token, spotify_refresh_token')
+          .eq('id', session.user.id)
+          .single()
 
-        if (!session?.user) {
-          await supabase.auth.signOut()
-          localStorage.clear()
-          sessionStorage.clear()
-          document.cookie = ''
-          window.location.href = '/login'
+        const token = userRow?.spotify_access_token
+        const refreshToken = userRow?.spotify_refresh_token
+
+        if (!token) {
+          console.warn('No Spotify token available')
           return
         }
 
-        const user = session.user
-        setUserEmail(user.email)
+        const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
 
-        const { error: upsertError } = await supabase.from('users').upsert(
-          {
-            id: user.id,
-            email: user.email,
-            role: 'freemium',
-            spotify_access_token: session.provider_token,
-            spotify_refresh_token: session.provider_refresh_token,
-            token_expires_at: new Date(Date.now() + 3600 * 1000),
-          },
-          { onConflict: 'id' }
-        )
+        if (res.status === 401 && refreshToken) {
+          const refreshed = await fetch('/api/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+          }).then(r => r.json())
 
-        const { data: userData } = await supabase
-          .from('users')
-          .select('spotify_access_token, spotify_refresh_token')
-          .eq('id', user.id)
-          .single()
+          if (refreshed.access_token) {
+            await supabase.from('users')
+              .update({ spotify_access_token: refreshed.access_token })
+              .eq('id', session.user.id)
 
-        const token = userData?.spotify_access_token
-        const refreshToken = userData?.spotify_refresh_token
-        setAccessToken(token)
-
-        if (token) {
-          const valid = await fetch('https://api.spotify.com/v1/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-
-          if (valid.status === 401 && refreshToken) {
-            const refreshResponse = await fetch('/api/refresh', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refresh_token: refreshToken }),
-            })
-
-            const refreshed = await refreshResponse.json()
-            if (refreshed.access_token) {
-              setAccessToken(refreshed.access_token)
-
-              await supabase.from('users').update({
-                spotify_access_token: refreshed.access_token,
-                token_expires_at: new Date(Date.now() + refreshed.expires_in * 1000),
-              }).eq('id', user.id)
-
-              await fetchNowPlaying(refreshed.access_token)
-              await fetchDevices(refreshed.access_token)
-            }
-          } else {
-            await fetchNowPlaying(token)
-            await fetchDevices(token)
+            setAccessToken(refreshed.access_token)
+            await fetchNowPlaying(refreshed.access_token)
+            await fetchDevices(refreshed.access_token)
           }
+        } else {
+          setAccessToken(token)
+          await fetchNowPlaying(token)
+          await fetchDevices(token)
         }
-      } catch (err) {
-        console.error('🔥 Error:', err)
+      } catch (error) {
+        console.error('Failed to load data', error)
       } finally {
-        clearTimeout(timeout)
         setLoading(false)
       }
     }
 
-    checkAndInsertUser()
-  }, [router])
+    loadData()
+  }, [session])
 
-  const fetchNowPlaying = async (token: string) => {
+  const fetchNowPlaying = async (token) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: { Authorization: `Bearer ${token}` },
       })
-
       if (res.ok && res.status !== 204) {
         const data = await res.json()
         setNowPlaying(data)
       } else {
         setNowPlaying(null)
       }
-    } catch (err) {
-      console.error('fetchNowPlaying error:', err)
+    } catch (error) {
+      console.error('Error fetching now playing', error)
     }
   }
 
-  const fetchDevices = async (token: string) => {
+  const fetchDevices = async (token) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
         headers: { Authorization: `Bearer ${token}` },
       })
-
       const data = await res.json()
-      setDevices(data.devices)
-    } catch (err) {
-      console.error('fetchDevices error:', err)
-    }
-  }
-
-  const transferPlayback = async (deviceId: string) => {
-    if (!accessToken) return
-    try {
-      await fetch('https://api.spotify.com/v1/me/player', {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ device_ids: [deviceId], play: true }),
-      })
-      await fetchNowPlaying(accessToken)
-    } catch (err) {
-      console.error('transferPlayback error:', err)
+      setDevices(data.devices || [])
+    } catch (error) {
+      console.error('Error fetching devices', error)
     }
   }
 
@@ -154,10 +105,11 @@ console.log('📦 session:', session)
   }
 
   const track = nowPlaying?.item
+  const userEmail = session?.user?.email
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center">Loading your vibe...</div>
     )
   }
 
@@ -168,7 +120,12 @@ console.log('📦 session:', session)
       {userEmail && (
         <>
           <p className="mb-4">Logged in as: {userEmail}</p>
-          <button onClick={handleLogout} className="px-4 py-2 mb-8 bg-black text-white rounded-xl">Logout</button>
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
+          >
+            Logout
+          </button>
         </>
       )}
 
@@ -177,7 +134,11 @@ console.log('📦 session:', session)
           <h2 className="text-xl font-semibold">Now Playing:</h2>
           <p className="mt-2 font-medium">{track.name}</p>
           <p className="text-sm text-gray-600">{track.artists?.[0]?.name}</p>
-          <img src={track.album?.images?.[0]?.url} alt="Album Cover" className="w-48 h-48 mt-4 rounded-lg shadow-lg" />
+          <img
+            src={track.album?.images?.[0]?.url}
+            alt="Album Cover"
+            className="w-48 h-48 mt-4 rounded-lg shadow-lg"
+          />
         </div>
       ) : (
         <p className="text-gray-600 mb-6">No track currently playing.</p>
@@ -192,7 +153,6 @@ console.log('📦 session:', session)
             {devices.map((device) => (
               <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
                 <span>{device.name} {device.is_active && '✅'}</span>
-                <button onClick={() => transferPlayback(device.id)} className="px-2 py-1 bg-green-600 text-white rounded-md text-sm">Connect</button>
               </li>
             ))}
           </ul>
