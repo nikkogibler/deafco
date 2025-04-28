@@ -21,17 +21,12 @@ export default function Dashboard() {
 
       try {
         const result = await supabase.auth.getSession();
-        console.log('🎯 getSession() result:', result);
-
         const session = result?.data?.session;
         const sessionError = result?.error;
 
         console.log('📦 session:', session);
-        console.log('🧨 sessionError:', sessionError);
-        console.log('🧐 Checking session validity...');
 
         if (sessionError || !session?.user) {
-          console.warn('🚫 No valid session found — forcing sign out and redirect');
           await supabase.auth.signOut();
           localStorage.clear();
           sessionStorage.clear();
@@ -43,23 +38,14 @@ export default function Dashboard() {
         const user = session.user;
         setUserEmail(user.email);
 
-        // Insert or update user
-        const { error: updateError } = await supabase
+        await supabase
           .from('users')
-          .update({ email: user.email, role: 'freemium' })
-          .eq('id', user.id);
+          .upsert({
+            id: user.id,
+            email: user.email,
+            role: 'freemium',
+          }, { onConflict: 'id' });
 
-        if (updateError) {
-          await supabase.from('users').insert([
-            {
-              id: user.id,
-              email: user.email,
-              role: 'freemium',
-            },
-          ]);
-        }
-
-        // Get token
         const { data: userData } = await supabase
           .from('users')
           .select('spotify_access_token')
@@ -74,9 +60,8 @@ export default function Dashboard() {
           await fetchDevices(token);
         }
       } catch (err) {
-        console.error('🔥 Unexpected error in checkAndInsertUser:', err);
+        console.error('🔥 Unexpected error:', err);
       } finally {
-        console.log('✅ Finished — setLoading(false)');
         clearTimeout(timeout);
         setLoading(false);
       }
@@ -91,15 +76,16 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.status === 204) {
-        console.log('🟡 Nothing currently playing');
-        setNowPlaying(null);
-      } else if (res.ok) {
-        const data = await res.json();
-        console.log('🎶 Now Playing:', data);
+      console.log('🎧 Now Playing status:', res.status);
+      const raw = await res.text();
+      console.log('📦 Raw Now Playing response:', raw);
+
+      if (res.ok && res.status !== 204) {
+        const data = JSON.parse(raw);
+        console.log('🎶 Parsed Now Playing:', data);
         setNowPlaying(data);
       } else {
-        console.warn('⚠️ Now playing fetch failed:', res.status);
+        setNowPlaying(null);
       }
     } catch (err) {
       console.error('💥 fetchNowPlaying error:', err);
@@ -112,12 +98,9 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setDevices(data.devices);
-      } else {
-        console.warn('⚠️ Device fetch failed:', res.status);
-      }
+      const data = await res.json();
+      console.log('🖥️ Devices:', data.devices);
+      setDevices(data.devices);
     } catch (err) {
       console.error('💥 fetchDevices error:', err);
     }
@@ -139,10 +122,10 @@ export default function Dashboard() {
       });
 
       if (res.ok) {
-        console.log('✅ Playback transferred to:', deviceId);
+        console.log('✅ Playback transferred');
         await fetchNowPlaying(accessToken);
       } else {
-        console.warn('❌ Failed to transfer playback:', res.status);
+        console.warn('⚠️ Transfer failed:', res.status);
       }
     } catch (err) {
       console.error('💥 transferPlayback error:', err);
@@ -161,14 +144,11 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
-        <p className="text-lg">Loading session...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <p>Loading session...</p>
         <button
-          onClick={() => {
-            console.warn('🛑 Force disabling loading...');
-            setLoading(false);
-          }}
-          className="mt-4 text-sm text-blue-600 underline"
+          onClick={() => setLoading(false)}
+          className="mt-4 text-blue-600 text-sm underline"
         >
           Force exit loading state
         </button>
@@ -207,22 +187,29 @@ export default function Dashboard() {
         <p className="text-gray-600 mb-6">No track currently playing.</p>
       )}
 
-      {devices && devices.length > 0 && (
+      {devices && (
         <div className="w-full max-w-md">
           <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
-          <ul className="space-y-2">
-            {devices.map((device) => (
-              <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
-                <span>{device.name}</span>
-                <button
-                  onClick={() => transferPlayback(device.id)}
-                  className="px-2 py-1 bg-green-600 text-white rounded-md text-sm"
-                >
-                  Connect
-                </button>
-              </li>
-            ))}
-          </ul>
+          {devices.length === 0 ? (
+            <p className="text-gray-500">No active Spotify devices found.</p>
+          ) : (
+            <ul className="space-y-2">
+              {devices.map((device) => (
+                <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
+                  <span>
+                    {device.name}
+                    {device.is_active && ' ✅'}
+                  </span>
+                  <button
+                    onClick={() => transferPlayback(device.id)}
+                    className="px-2 py-1 bg-green-600 text-white rounded-md text-sm"
+                  >
+                    Connect
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </div>
