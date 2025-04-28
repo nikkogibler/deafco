@@ -113,7 +113,7 @@ export default function Dashboard() {
       
       {/* SonicSuite Logo at the top center */}
       <div className="absolute top-8">
-        <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={160} height={40} />
+        <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={960} height={240} />
       </div>
 
       {/* Spotify White Logo at the top-right corner */}
