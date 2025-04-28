@@ -19,17 +19,11 @@ export default function Dashboard() {
     }, 8000)
 
     const checkAndInsertUser = async () => {
-      console.log('🔁 checkAndInsertUser running...')
-
       try {
         const result = await supabase.auth.getSession()
         const session = result?.data?.session
-        const sessionError = result?.error
 
-        console.log('📦 session:', session)
-
-        if (sessionError || !session?.user) {
-          console.warn('🚫 Invalid session — forcing logout')
+        if (!session?.user) {
           await supabase.auth.signOut()
           localStorage.clear()
           sessionStorage.clear()
@@ -53,21 +47,11 @@ export default function Dashboard() {
           { onConflict: 'id' }
         )
 
-        if (upsertError) {
-          console.error('🛑 Error upserting user:', upsertError.message)
-        } else {
-          console.log('✅ User upserted with tokens')
-        }
-
-        const { data: userData, error: tokenFetchError } = await supabase
+        const { data: userData } = await supabase
           .from('users')
           .select('spotify_access_token, spotify_refresh_token')
           .eq('id', user.id)
           .single()
-
-        if (tokenFetchError) {
-          console.error('🔐 Token fetch error:', tokenFetchError.message)
-        }
 
         const token = userData?.spotify_access_token
         const refreshToken = userData?.spotify_refresh_token
@@ -79,8 +63,6 @@ export default function Dashboard() {
           })
 
           if (valid.status === 401 && refreshToken) {
-            console.log('🔁 Access token expired, trying refresh...')
-
             const refreshResponse = await fetch('/api/refresh', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -89,7 +71,6 @@ export default function Dashboard() {
 
             const refreshed = await refreshResponse.json()
             if (refreshed.access_token) {
-              console.log('✅ Refreshed token:', refreshed.access_token)
               setAccessToken(refreshed.access_token)
 
               await supabase.from('users').update({
@@ -99,18 +80,14 @@ export default function Dashboard() {
 
               await fetchNowPlaying(refreshed.access_token)
               await fetchDevices(refreshed.access_token)
-            } else {
-              console.warn('❌ Failed to refresh token')
             }
           } else {
             await fetchNowPlaying(token)
             await fetchDevices(token)
           }
-        } else {
-          console.warn('⚠️ No Spotify token found — skipping playback fetch')
         }
       } catch (err) {
-        console.error('🔥 Unexpected error in checkAndInsertUser:', err)
+        console.error('🔥 Error:', err)
       } finally {
         clearTimeout(timeout)
         setLoading(false)
@@ -126,18 +103,14 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       })
 
-      const raw = await res.text()
-      console.log('🎧 Now Playing status:', res.status)
-      console.log('📦 Raw Now Playing response:', raw)
-
       if (res.ok && res.status !== 204) {
-        const data = JSON.parse(raw)
+        const data = await res.json()
         setNowPlaying(data)
       } else {
         setNowPlaying(null)
       }
     } catch (err) {
-      console.error('💥 fetchNowPlaying error:', err)
+      console.error('fetchNowPlaying error:', err)
     }
   }
 
@@ -150,14 +123,14 @@ export default function Dashboard() {
       const data = await res.json()
       setDevices(data.devices)
     } catch (err) {
-      console.error('💥 fetchDevices error:', err)
+      console.error('fetchDevices error:', err)
     }
   }
 
   const transferPlayback = async (deviceId: string) => {
     if (!accessToken) return
     try {
-      const res = await fetch('https://api.spotify.com/v1/me/player', {
+      await fetch('https://api.spotify.com/v1/me/player', {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -165,41 +138,25 @@ export default function Dashboard() {
         },
         body: JSON.stringify({ device_ids: [deviceId], play: true }),
       })
-
-      if (res.ok) {
-        await fetchNowPlaying(accessToken)
-      } else {
-        console.warn('⚠️ Failed to transfer playback:', res.status)
-      }
+      await fetchNowPlaying(accessToken)
     } catch (err) {
-      console.error('💥 transferPlayback error:', err)
+      console.error('transferPlayback error:', err)
     }
   }
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut()
-    } finally {
-      localStorage.clear()
-      sessionStorage.clear()
-      document.cookie = ''
-      window.location.href = '/login'
-    }
+    await supabase.auth.signOut()
+    localStorage.clear()
+    sessionStorage.clear()
+    document.cookie = ''
+    window.location.href = '/login'
   }
 
   const track = nowPlaying?.item
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
-        <p>Loading session...</p>
-        <button
-          onClick={() => setLoading(false)}
-          className="mt-4 text-sm text-blue-600 underline"
-        >
-          Force exit loading state
-        </button>
-      </div>
+      <div className="min-h-screen flex items-center justify-center">Loading...</div>
     )
   }
 
@@ -210,12 +167,7 @@ export default function Dashboard() {
       {userEmail && (
         <>
           <p className="mb-4">Logged in as: {userEmail}</p>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
-          >
-            Logout
-          </button>
+          <button onClick={handleLogout} className="px-4 py-2 mb-8 bg-black text-white rounded-xl">Logout</button>
         </>
       )}
 
@@ -224,38 +176,27 @@ export default function Dashboard() {
           <h2 className="text-xl font-semibold">Now Playing:</h2>
           <p className="mt-2 font-medium">{track.name}</p>
           <p className="text-sm text-gray-600">{track.artists?.[0]?.name}</p>
-          <img
-            src={track.album?.images?.[0]?.url}
-            alt="Album Cover"
-            className="w-48 h-48 mt-4 rounded-lg shadow-lg"
-          />
+          <img src={track.album?.images?.[0]?.url} alt="Album Cover" className="w-48 h-48 mt-4 rounded-lg shadow-lg" />
         </div>
       ) : (
         <p className="text-gray-600 mb-6">No track currently playing.</p>
       )}
 
-      {devices && (
-        <div className="w-full max-w-md">
-          <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
-          {devices.length === 0 ? (
-            <p className="text-gray-500">No active Spotify devices found.</p>
-          ) : (
-            <ul className="space-y-2">
-              {devices.map((device) => (
-                <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
-                  <span>{device.name} {device.is_active && '✅'}</span>
-                  <button
-                    onClick={() => transferPlayback(device.id)}
-                    className="px-2 py-1 bg-green-600 text-white rounded-md text-sm"
-                  >
-                    Connect
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      <div className="w-full max-w-md">
+        <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
+        {devices.length === 0 ? (
+          <p className="text-gray-500">No active Spotify devices found.</p>
+        ) : (
+          <ul className="space-y-2">
+            {devices.map((device) => (
+              <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
+                <span>{device.name} {device.is_active && '✅'}</span>
+                <button onClick={() => transferPlayback(device.id)} className="px-2 py-1 bg-green-600 text-white rounded-md text-sm">Connect</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
