@@ -15,6 +15,19 @@ export default function Login() {
       const refreshToken = hashParams.get('refresh_token')
       const expiresIn = hashParams.get('expires_in')
 
+      // ⭐ INSERT REDIRECT HERE ⭐
+      if (!accessToken && session?.user) {
+        console.log('No Spotify token found. Redirecting to Spotify login...')
+
+        const clientId = 'YOUR_SPOTIFY_CLIENT_ID' // <-- replace this
+        const redirectUri = encodeURIComponent('https://your-app.vercel.app/login') // <-- replace this
+        const scopes = encodeURIComponent('user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state')
+
+        window.location.href = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}`
+        return // Important: stop execution after redirect
+      }
+
+      // ✅ Capture tokens if present
       if (accessToken && session?.user) {
         console.log('Captured Spotify tokens, updating Supabase...')
 
@@ -35,10 +48,6 @@ export default function Login() {
 
         // Tokens saved successfully → Redirect to dashboard
         router.push('/dashboard')
-      } else if (!accessToken) {
-        console.error('No Spotify access token found in URL.')
-        alert('No Spotify access token found. Please try logging in again.')
-        router.push('/login')
       }
     }
 
