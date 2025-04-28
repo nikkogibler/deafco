@@ -2,12 +2,19 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { useSession } from '@supabase/auth-helpers-react'
 import supabase from '@/utils/supabaseClient'
 
 export default function Login() {
   const router = useRouter()
+  const session = useSession()
 
   useEffect(() => {
+    if (session?.user) {
+      router.push('/dashboard')
+      return
+    }
+
     const signInWithSpotify = async () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'spotify',
@@ -24,7 +31,7 @@ export default function Login() {
     }
 
     signInWithSpotify()
-  }, [])
+  }, [session, router])
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
