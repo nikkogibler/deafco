@@ -10,23 +10,17 @@ export default function Login() {
     const handleAuthFlow = async () => {
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = hashParams.get('access_token')
-      const refreshToken = hashParams.get('refresh_token')
-      const expiresIn = hashParams.get('expires_in')
+      const refreshToken = hashParams.get('refresh_token') || null // Optional — Spotify might not send refresh token here
+      const expiresIn = hashParams.get('expires_in') || 3600
 
       if (accessToken) {
-        console.log('Captured Spotify tokens. Saving...')
-
-        // Try to get Supabase session user info (if available)
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-        if (userError) {
-          console.error('Error fetching Supabase user:', userError.message)
-        }
+        console.log('Access token found. Saving to Supabase...')
+        
+        // Optional: get Supabase user if session exists
+        const { data: { user } } = await supabase.auth.getUser()
 
         if (user) {
-          console.log('Supabase user exists. Saving Spotify tokens.')
-
-          const { error } = await supabase
+          await supabase
             .from('users')
             .upsert({
               id: user.id,
@@ -34,28 +28,23 @@ export default function Login() {
               spotify_refresh_token: refreshToken,
               token_expires_at: Math.floor(Date.now() / 1000) + Number(expiresIn),
             }, { onConflict: 'id' })
-
-          if (error) {
-            console.error('Error saving Spotify tokens to Supabase:', error.message)
-            alert('Problem saving your Spotify login. Please try again.')
-            return
-          }
-
-          router.push('/dashboard')
         } else {
-          console.warn('No Supabase user session. Proceeding anyway.')
-          // You might choose to push to dashboard or reinitiate supabase.auth.refreshSession()
-          router.push('/dashboard')
+          console.warn('No Supabase user session. Proceeding without saving to users table.')
         }
+
+        // Clear the hash from URL after processing
+        window.history.replaceState({}, document.title, window.location.pathname)
+
+        // Go to dashboard
+        router.push('/dashboard')
       } else {
         console.log('No access token. Redirecting to Spotify login.')
+
         const clientId = 'f2a8dfe8bd764c32a3b2f71b1d271ed9'
         const redirectUri = encodeURIComponent('https://deafco.vercel.app/login')
-const scopes = encodeURIComponent('user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state')
+        const scopes = encodeURIComponent('user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state')
 
-const spotifyLoginUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}`
-
-window.location.href = spotifyLoginUrl
+        window.location.href = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}`
       }
     }
 
