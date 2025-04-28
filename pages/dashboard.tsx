@@ -12,7 +12,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      console.warn('⚠️ Fallback timeout: forcing UI load');
+      console.warn('⏱️ Fallback timeout triggered');
       setLoading(false);
     }, 8000);
 
@@ -27,6 +27,7 @@ export default function Dashboard() {
         console.log('📦 session:', session);
 
         if (sessionError || !session?.user) {
+          console.warn('🚫 Invalid session — forcing logout');
           await supabase.auth.signOut();
           localStorage.clear();
           sessionStorage.clear();
@@ -38,19 +39,33 @@ export default function Dashboard() {
         const user = session.user;
         setUserEmail(user.email);
 
-        await supabase
-          .from('users')
-          .upsert({
+        const { error: upsertError } = await supabase.from('users').upsert(
+          {
             id: user.id,
             email: user.email,
             role: 'freemium',
-          }, { onConflict: 'id' });
+            spotify_access_token: session.provider_token,
+            spotify_refresh_token: session.provider_refresh_token,
+            token_expires_at: new Date(Date.now() + 3600 * 1000),
+          },
+          { onConflict: 'id' }
+        );
 
-        const { data: userData } = await supabase
+        if (upsertError) {
+          console.error('🛑 Error upserting user:', upsertError.message);
+        } else {
+          console.log('✅ User upserted with tokens');
+        }
+
+        const { data: userData, error: tokenFetchError } = await supabase
           .from('users')
           .select('spotify_access_token')
           .eq('id', user.id)
           .single();
+
+        if (tokenFetchError) {
+          console.error('🔐 Token fetch error:', tokenFetchError.message);
+        }
 
         const token = userData?.spotify_access_token;
         setAccessToken(token);
@@ -58,9 +73,11 @@ export default function Dashboard() {
         if (token) {
           await fetchNowPlaying(token);
           await fetchDevices(token);
+        } else {
+          console.warn('⚠️ No Spotify token found — skipping playback fetch');
         }
       } catch (err) {
-        console.error('🔥 Unexpected error:', err);
+        console.error('🔥 Unexpected error in checkAndInsertUser:', err);
       } finally {
         clearTimeout(timeout);
         setLoading(false);
@@ -76,13 +93,12 @@ export default function Dashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log('🎧 Now Playing status:', res.status);
       const raw = await res.text();
+      console.log('🎧 Now Playing status:', res.status);
       console.log('📦 Raw Now Playing response:', raw);
 
       if (res.ok && res.status !== 204) {
         const data = JSON.parse(raw);
-        console.log('🎶 Parsed Now Playing:', data);
         setNowPlaying(data);
       } else {
         setNowPlaying(null);
@@ -99,7 +115,6 @@ export default function Dashboard() {
       });
 
       const data = await res.json();
-      console.log('🖥️ Devices:', data.devices);
       setDevices(data.devices);
     } catch (err) {
       console.error('💥 fetchDevices error:', err);
@@ -115,17 +130,13 @@ export default function Dashboard() {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          device_ids: [deviceId],
-          play: true,
-        }),
+        body: JSON.stringify({ device_ids: [deviceId], play: true }),
       });
 
       if (res.ok) {
-        console.log('✅ Playback transferred');
         await fetchNowPlaying(accessToken);
       } else {
-        console.warn('⚠️ Transfer failed:', res.status);
+        console.warn('⚠️ Failed to transfer playback:', res.status);
       }
     } catch (err) {
       console.error('💥 transferPlayback error:', err);
@@ -133,11 +144,14 @@ export default function Dashboard() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    sessionStorage.clear();
-    document.cookie = '';
-    window.location.href = '/login';
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      localStorage.clear();
+      sessionStorage.clear();
+      document.cookie = '';
+      window.location.href = '/login';
+    }
   };
 
   const track = nowPlaying?.item;
@@ -148,7 +162,7 @@ export default function Dashboard() {
         <p>Loading session...</p>
         <button
           onClick={() => setLoading(false)}
-          className="mt-4 text-blue-600 text-sm underline"
+          className="mt-4 text-sm text-blue-600 underline"
         >
           Force exit loading state
         </button>
@@ -196,10 +210,7 @@ export default function Dashboard() {
             <ul className="space-y-2">
               {devices.map((device) => (
                 <li key={device.id} className="flex justify-between items-center border p-2 rounded-md">
-                  <span>
-                    {device.name}
-                    {device.is_active && ' ✅'}
-                  </span>
+                  <span>{device.name} {device.is_active && '✅'}</span>
                   <button
                     onClick={() => transferPlayback(device.id)}
                     className="px-2 py-1 bg-green-600 text-white rounded-md text-sm"
