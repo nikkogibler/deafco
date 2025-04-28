@@ -1,42 +1,50 @@
-'use client'
-
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSession } from '@supabase/auth-helpers-react'
-import supabase from '@/utils/supabaseClient'
+import { useSession, useSupabaseClient } from '@supabase/auth-helpers-react'
 
 export default function Login() {
   const router = useRouter()
   const session = useSession()
+  const supabase = useSupabaseClient()
 
   useEffect(() => {
-    if (session?.user) {
-      router.push('/dashboard')
-      return
-    }
+    const handleSpotifyCallback = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
 
-    const signInWithSpotify = async () => {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'spotify',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          scopes:
-            'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
-        },
-      })
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const expiresIn = hashParams.get('expires_in')
 
-      if (error) {
-        console.error('Spotify login error:', error.message)
+      if (accessToken) {
+        // Update the user in Supabase with Spotify tokens
+        const { data, error } = await supabase
+          .from('users')
+          .update({
+            spotify_access_token: accessToken,
+            spotify_refresh_token: refreshToken,
+            token_expires_at: Math.floor(Date.now() / 1000) + Number(expiresIn),
+          })
+          .eq('id', session.user.id)
+
+        if (error) {
+          console.error('Error updating Spotify tokens:', error.message)
+          alert('There was a problem saving your Spotify login. Please try again.')
+          return
+        }
+
+        // Redirect to dashboard after successful login
+        router.push('/dashboard')
       }
     }
 
-    signInWithSpotify()
-  }, [session, router])
+    if (session) {
+      handleSpotifyCallback()
+    }
+  }, [session, supabase, router])
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
-      <h1 className="text-3xl font-bold mb-4">Redirecting to Spotify...</h1>
-      <p>If nothing happens, try refreshing the page.</p>
+    <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+      <h1 className="text-3xl font-bold">Loading your vibe...</h1>
     </div>
   )
 }
