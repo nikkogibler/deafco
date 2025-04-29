@@ -2,27 +2,25 @@ import { v4 as uuidv4 } from 'uuid'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
-console.log('🚀 Callback hit')
-console.log('ENV Vars:', {
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  spotifyClientId: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID,
-  spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET,
-})
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  console.log('🚀 Callback hit')
+
   const code = req.query.code as string
-  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!
+  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   const redirectUri = 'https://deafco.vercel.app/api/callback'
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!clientId || !clientSecret || !supabaseUrl || !supabaseKey) {
+    console.error('❌ Missing ENV vars', { clientId, clientSecret, supabaseUrl, supabaseKey })
+    return res.redirect('/login?error=env_missing')
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey)
 
   try {
-    console.log('🎧 Step 1: Received Spotify code:', code)
+    console.log('🎧 Step 1: Received code:', code)
 
     // Exchange code for access token
     const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
@@ -86,7 +84,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('✅ Supabase upsert succeeded. Redirecting to /dashboard...')
     return res.redirect('/dashboard')
-
   } catch (err) {
     console.error('❌ OAuth callback error:', err)
     return res.redirect('/login?error=server_error')
