@@ -5,19 +5,20 @@ export default function Login() {
   const supabase = useSupabaseClient()
 
   const handleSpotifyLogin = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    // Initiate Supabase OAuth flow for Spotify
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
         scopes:
           'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
-        redirectTo: 'https://deafco.vercel.app/dashboard', // Ensure it's this exact URL
+        redirectTo: 'https://deafco.vercel.app/dashboard',  // Ensure correct redirect URI
       },
     })
 
     if (error) {
       console.error('❌ Supabase login error:', error.message)
     } else {
-      console.log('🔗 Redirecting to Spotify login...', data?.url)
+      console.log('🔗 Redirecting to Spotify login...')
     }
   }
 
