@@ -14,59 +14,59 @@ export default function Dashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    // Handle Spotify OAuth code from the URL (redirected from Spotify after login)
-    if (router.query.code) {
-      const fetchAccessToken = async () => {
-        const code = router.query.code as string
-        const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
-        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-        const redirectUri = 'https://deafco.vercel.app/dashboard'
+    const checkSession = async () => {
+      // If code is available in URL (Spotify redirected with code)
+      if (router.query.code) {
+        const fetchAccessToken = async () => {
+          const code = router.query.code as string
+          const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+          const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+          const redirectUri = 'https://deafco.vercel.app/dashboard'
 
-        // Fetch the access token from Spotify using the code
-        const response = await fetch('https://accounts.spotify.com/api/token', {
-          method: 'POST',
-          headers: {
-            Authorization:
-              'Basic ' +
-              Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code: code,
-            redirect_uri: redirectUri,
-          }),
-        })
+          // Exchange the authorization code for an access token from Spotify
+          const response = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+              Authorization:
+                'Basic ' +
+                Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              grant_type: 'authorization_code',
+              code: code,
+              redirect_uri: redirectUri,
+            }),
+          })
 
-        const data = await response.json()
+          const data = await response.json()
 
-        if (data.access_token) {
-          // Store the access token and refresh token in Supabase
-          await supabase
-            .from('users')
-            .upsert({
-              spotify_access_token: data.access_token,
-              spotify_refresh_token: data.refresh_token,
-              token_expires_at: new Date(Date.now() + data.expires_in * 1000), // Expires in seconds
-            })
-            .eq('id', data.id)
+          if (data.access_token) {
+            // Store the access token and refresh token in Supabase
+            await supabase
+              .from('users')
+              .upsert({
+                spotify_access_token: data.access_token,
+                spotify_refresh_token: data.refresh_token,
+                token_expires_at: new Date(Date.now() + data.expires_in * 1000), // Expires in seconds
+              })
+              .eq('id', data.id)
 
-          setAccessToken(data.access_token)
-          await fetchNowPlaying(data.access_token)
-          await fetchDevices(data.access_token)
-        } else {
-          console.error('Error getting access token:', data)
+            setAccessToken(data.access_token)
+            await fetchNowPlaying(data.access_token)
+            await fetchDevices(data.access_token)
+          } else {
+            console.error('Error fetching access token:', data)
+          }
         }
-      }
 
-      fetchAccessToken()
-    } else {
-      // Handle session when there's no code in the URL
-      const checkSession = async () => {
+        fetchAccessToken()
+      } else {
+        // If there's no code, we proceed with regular session checking
         const { data, error } = await supabase.auth.getSession()
 
         if (!data?.session?.user) {
-          window.location.href = '/login'
+          window.location.href = '/login'  // Redirect to login if no session found
           return
         }
 
@@ -117,9 +117,9 @@ export default function Dashboard() {
 
         setLoading(false)
       }
-
-      checkSession()
     }
+
+    checkSession()
   }, [router])
 
   const fetchNowPlaying = async (token: string) => {
