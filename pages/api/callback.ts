@@ -22,7 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const redirectUri = 'https://deafco.vercel.app/api/callback'
 
   try {
-    // Exchange code for Spotify access token
+    console.log('🎧 Step 1: Received Spotify code:', code)
+
+    // Exchange code for access token
     const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -38,8 +40,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
 
     const tokenData = await tokenRes.json()
+    console.log('🎧 Step 2: Token response:', tokenData)
+
     if (!tokenData.access_token) {
-      console.error('No access_token returned:', tokenData)
+      console.error('❌ No access_token returned:', tokenData)
       return res.redirect('/login?error=spotify_token_failed')
     }
 
@@ -53,14 +57,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
 
     const profile = await userRes.json()
+    console.log('🎧 Step 3: Spotify user profile:', profile)
+
     if (!profile.id || !profile.email) {
-      console.error('Invalid Spotify user profile:', profile)
+      console.error('❌ Invalid Spotify user profile:', profile)
       return res.redirect('/login?error=spotify_profile_failed')
     }
 
     const generatedId = uuidv4()
+    console.log('🎧 Step 4: Generated UUID:', generatedId)
 
-    // Save to Supabase users table
+    // Save to Supabase
     const { error } = await supabase.from('users').upsert({
       id: generatedId,
       email: profile.email,
@@ -73,13 +80,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
 
     if (error) {
-      console.error('Supabase upsert failed:', error)
+      console.error('❌ Supabase upsert failed:', error)
       return res.redirect('/login?error=upsert_failed')
     }
 
+    console.log('✅ Supabase upsert succeeded. Redirecting to /dashboard...')
     return res.redirect('/dashboard')
+
   } catch (err) {
-    console.error('OAuth callback failed:', err)
+    console.error('❌ OAuth callback error:', err)
     return res.redirect('/login?error=server_error')
   }
 }
