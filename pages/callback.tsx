@@ -1,11 +1,13 @@
+// /pages/auth/callback.tsx (upgraded)
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
+import { useSupabaseClient, useUser, useSessionContext } from '@supabase/auth-helpers-react'
 
 export default function AfterLogin() {
   const supabase = useSupabaseClient()
   const user = useUser()
+  const { isLoading } = useSessionContext()
   const router = useRouter()
 
   useEffect(() => {
@@ -14,23 +16,24 @@ export default function AfterLogin() {
         const { data, error } = await supabase
           .from('users')
           .upsert({
-            id: user.id,         // Supabase Auth UID
+            id: user.id,
             email: user.email,
             spotify_access_token: user.user_metadata?.spotify_access_token || null,
-            // You can add more fields later
           }, { onConflict: ['id'] })
 
         if (error) {
           console.error('Failed to upsert user:', error)
         } else {
           console.log('User upserted successfully:', data)
-          router.push('/dashboard') // ✅ Redirect after creating user
+          router.push('/dashboard')
         }
       }
     }
 
-    createUserIfNotExists()
-  }, [user])
+    if (!isLoading) {
+      createUserIfNotExists()
+    }
+  }, [user, isLoading])
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
