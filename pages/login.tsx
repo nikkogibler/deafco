@@ -10,14 +10,14 @@ export default function Login() {
       options: {
         scopes:
           'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
-        redirectTo: 'https://deafco.vercel.app/dashboard',
+        redirectTo: 'https://deafco.vercel.app/dashboard', // Ensure it's this exact URL
       },
     })
 
     if (error) {
       console.error('❌ Supabase login error:', error.message)
     } else {
-      console.log('🔗 Redirecting to Spotify login...')
+      console.log('🔗 Redirecting to Spotify login...', data?.url)
     }
   }
 
