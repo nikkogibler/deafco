@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
 import { useRouter } from 'next/router'
 
@@ -6,8 +6,17 @@ export default function Login() {
   const supabase = useSupabaseClient()
   const router = useRouter()
 
+  useEffect(() => {
+    const session = supabase.auth.session()
+    
+    if (session) {
+      // Redirect the user to /dashboard if they are already logged in
+      router.push('/dashboard')
+    }
+  }, [supabase, router])
+
   const handleSpotifyLogin = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
         scopes:
@@ -16,13 +25,10 @@ export default function Login() {
       },
     })
 
-    // Log the generated URL Supabase is using
-    if (data) {
-      console.log('🔗 Supabase generated OAuth URL:', data.url)  // This will show the exact URL
-    }
-
     if (error) {
       console.error('❌ Supabase login error:', error.message)
+    } else {
+      console.log('🔗 Redirecting to Spotify login...')
     }
   }
 
