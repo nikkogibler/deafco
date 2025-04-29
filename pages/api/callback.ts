@@ -19,7 +19,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const code = req.query.code as string
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!
-  const redirectUri = 'https://deafco.vercel.app/api/callback'
 
   try {
     // Exchange code for Spotify access token
@@ -30,6 +29,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+
+        const redirectUri = 'https://deafco.vercel.app/api/callback'
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
