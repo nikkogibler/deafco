@@ -7,12 +7,17 @@ export default function Login() {
   const router = useRouter()
 
   useEffect(() => {
-    const session = supabase.auth.session()
-    
-    if (session) {
-      // Redirect the user to /dashboard if they are already logged in
-      router.push('/dashboard')
+    // Use the correct method to get the current session
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session) {
+        // Redirect the user to /dashboard if they are already logged in
+        router.push('/dashboard')
+      }
     }
+
+    getSession() // Call the session fetching function
   }, [supabase, router])
 
   const handleSpotifyLogin = async () => {
