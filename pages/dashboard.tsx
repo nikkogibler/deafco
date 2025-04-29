@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import supabase from '@/utils/supabaseClient'
 import Image from 'next/image'
+import { useRouter } from 'next/router'
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true)
@@ -10,9 +11,11 @@ export default function Dashboard() {
   const [nowPlaying, setNowPlaying] = useState<any | null>(null)
   const [devices, setDevices] = useState<any[]>([])
   const [accessToken, setAccessToken] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const checkSession = async () => {
+      // Get the current user session
       const { data, error } = await supabase.auth.getSession()
 
       if (!data?.session?.user) {
@@ -23,6 +26,7 @@ export default function Dashboard() {
       const user = data.session.user
       setUserEmail(user.email)
 
+      // Fetch the stored tokens from Supabase
       const { data: userData } = await supabase
         .from('users')
         .select('spotify_access_token, spotify_refresh_token')
@@ -38,6 +42,7 @@ export default function Dashboard() {
         return
       }
 
+      // If no token, try refreshing or go to login
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -47,7 +52,7 @@ export default function Dashboard() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),
-        }).then(r => r.json())
+        }).then((r) => r.json())
 
         if (refreshed.access_token) {
           await supabase
@@ -67,8 +72,55 @@ export default function Dashboard() {
       setLoading(false)
     }
 
-    checkSession()
-  }, [])
+    // Handle the redirect from Spotify OAuth (if we have a code in the URL)
+    if (router.query.code) {
+      // Fetch the token using the code
+      const fetchAccessToken = async () => {
+        const code = router.query.code as string
+        const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+        const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+        const redirectUri = 'https://deafco.vercel.app/dashboard'
+
+        // Fetch the access token from Spotify
+        const response = await fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            Authorization:
+              'Basic ' +
+              Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: redirectUri,
+          }),
+        })
+
+        const data = await response.json()
+
+        if (data.access_token) {
+          // Store the access token and refresh token in Supabase
+          await supabase
+            .from('users')
+            .upsert({
+              spotify_access_token: data.access_token,
+              spotify_refresh_token: data.refresh_token,
+              token_expires_at: new Date(Date.now() + data.expires_in * 1000), // Expires in seconds
+            })
+            .eq('id', data.id)
+
+          setAccessToken(data.access_token)
+          await fetchNowPlaying(data.access_token)
+          await fetchDevices(data.access_token)
+        }
+      }
+
+      fetchAccessToken()
+    } else {
+      checkSession()
+    }
+  }, [supabase, router])
 
   const fetchNowPlaying = async (token: string) => {
     const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
@@ -111,7 +163,6 @@ export default function Dashboard() {
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-40" style={{ backgroundColor: '#141b24', color: 'white' }}>
 
-      
       {/* SonicSuite Logo at the top center */}
       <div className="absolute top-8">
         <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={480} height={120} />
@@ -137,21 +188,20 @@ export default function Dashboard() {
           </>
         )}
 
-       {nowPlaying?.item ? (
-  <div className="mb-10 flex flex-col items-center">
-    <h2 className="text-xl font-semibold">Now Playing:</h2>
-    <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
-    <p className="text-sm text-gray-400">{nowPlaying.item.artists?.[0]?.name}</p>
-    <img
-      src={nowPlaying.item.album?.images?.[0]?.url}
-      alt="Album Cover"
-      className="w-48 h-48 mt-4 rounded-lg shadow-lg"
-    />
-  </div>
-) : (
-  <p className="text-gray-400 mb-6">No track currently playing.</p>
-)}
-
+        {nowPlaying?.item ? (
+          <div className="mb-10 flex flex-col items-center">
+            <h2 className="text-xl font-semibold">Now Playing:</h2>
+            <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
+            <p className="text-sm text-gray-400">{nowPlaying.item.artists?.[0]?.name}</p>
+            <img
+              src={nowPlaying.item.album?.images?.[0]?.url}
+              alt="Album Cover"
+              className="w-48 h-48 mt-4 rounded-lg shadow-lg"
+            />
+          </div>
+        ) : (
+          <p className="text-gray-400 mb-6">No track currently playing.</p>
+        )}
 
         <div className="w-full max-w-md">
           <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
