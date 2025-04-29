@@ -1,12 +1,20 @@
 // pages/_app.tsx
-import '../styles/globals.css';
+import { useState } from 'react'
+import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs'
+import { SessionContextProvider } from '@supabase/auth-helpers-react'
+import '../styles/globals.css'
 
-function MyApp({ Component, pageProps }) {
+export default function MyApp({ Component, pageProps }) {
+  const [supabase] = useState(() => createBrowserSupabaseClient())
+
   return (
-    <div className="bg-gray-900 text-white min-h-screen">
-      <Component {...pageProps} />
-    </div>
-  );
+    <SessionContextProvider
+      supabaseClient={supabase}
+      initialSession={pageProps.initialSession}
+    >
+      <div className="bg-gray-900 text-white min-h-screen">
+        <Component {...pageProps} />
+      </div>
+    </SessionContextProvider>
+  )
 }
-
-export default MyApp;
