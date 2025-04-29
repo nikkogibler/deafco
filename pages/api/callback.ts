@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
@@ -18,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const code = req.query.code as string
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!
-  const redirectUri = 'https://deafco.vercel.app/api/callback' // ✅ Moved here
+  const redirectUri = 'https://deafco.vercel.app/api/callback'
 
   try {
     // Exchange code for Spotify access token
@@ -57,11 +58,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.redirect('/login?error=spotify_profile_failed')
     }
 
+    const generatedId = uuidv4()
+
     // Save to Supabase users table
     const { error } = await supabase.from('users').upsert({
-      id: profile.id,
+      id: generatedId,
       email: profile.email,
+      name: profile.display_name || '',
+      role: 'user',
+      spotify_id: profile.id,
       spotify_access_token: access_token,
+      spotify_refresh_token: null,
+      token_expires_at: null,
     })
 
     if (error) {
@@ -69,7 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.redirect('/login?error=upsert_failed')
     }
 
-    // Redirect to dashboard
     return res.redirect('/dashboard')
   } catch (err) {
     console.error('OAuth callback failed:', err)
