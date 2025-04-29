@@ -1,40 +1,25 @@
-import React, { useEffect } from 'react'
-import { useSupabaseClient } from '@supabase/auth-helpers-react'
+import React from 'react'
 import { useRouter } from 'next/router'
 
 export default function Login() {
-  const supabase = useSupabaseClient()
   const router = useRouter()
 
-  useEffect(() => {
-    // Use the correct method to get the current session
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        // Redirect the user to /dashboard if they are already logged in
-        router.push('/dashboard')
-      }
-    }
+  const handleSpotifyLogin = () => {
+    const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+    const redirectUri = 'https://deafco.vercel.app/dashboard'
+    const scopes = [
+      'user-read-email',
+      'user-read-private',
+      'user-read-playback-state',
+      'user-read-currently-playing',
+      'user-modify-playback-state',
+    ].join(' ')
 
-    getSession() // Call the session fetching function
-  }, [supabase, router])
-
-  const handleSpotifyLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'spotify',
-      options: {
-        scopes:
-          'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
-        redirectTo: 'https://deafco.vercel.app/dashboard', // Ensure it's this exact URL
-      },
-    })
-
-    if (error) {
-      console.error('❌ Supabase login error:', error.message)
-    } else {
-      console.log('🔗 Redirecting to Spotify login...')
-    }
+    // Construct the Spotify OAuth URL
+    const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`
+    
+    // Redirect to Spotify for login
+    window.location.href = authUrl
   }
 
   return (
