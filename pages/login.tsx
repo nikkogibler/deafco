@@ -21,7 +21,7 @@ export default function Login() {
   }, [supabase, router])
 
   const handleSpotifyLogin = async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
         scopes:
@@ -29,11 +29,6 @@ export default function Login() {
         redirectTo: 'https://deafco.vercel.app/dashboard', // Ensure it's this exact URL
       },
     })
-
-    // Log the generated URL Supabase is using for OAuth
-    if (data) {
-      console.log('🔗 Supabase generated OAuth URL:', data.url)  // This will show the exact URL
-    }
 
     if (error) {
       console.error('❌ Supabase login error:', error.message)
