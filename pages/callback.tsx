@@ -1,1 +1,40 @@
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { useSupabaseClient, useUser } from '@supabase/auth-helpers-react'
+
+export default function AfterLogin() {
+  const supabase = useSupabaseClient()
+  const user = useUser()
+  const router = useRouter()
+
+  useEffect(() => {
+    const createUserIfNotExists = async () => {
+      if (user) {
+        const { data, error } = await supabase
+          .from('users')
+          .upsert({
+            id: user.id,         // Supabase Auth UID
+            email: user.email,
+            spotify_access_token: user.user_metadata?.spotify_access_token || null,
+            // You can add more fields later
+          }, { onConflict: ['id'] })
+
+        if (error) {
+          console.error('Failed to upsert user:', error)
+        } else {
+          console.log('User upserted successfully:', data)
+          router.push('/dashboard') // ✅ Redirect after creating user
+        }
+      }
+    }
+
+    createUserIfNotExists()
+  }, [user])
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <h1 className="text-2xl font-bold">Finishing login...</h1>
+    </div>
+  )
+}
