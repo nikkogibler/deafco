@@ -1,29 +1,24 @@
 import React from 'react'
+import { useSupabaseClient } from '@supabase/auth-helpers-react'
 
 export default function Login() {
-  const handleSpotifyLogin = () => {
-    const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
-    const redirectUri = 'https://deafco.vercel.app/api/callback'
+  const supabase = useSupabaseClient()
 
-    if (!clientId) {
-      console.error('❌ Missing Spotify Client ID')
-      return
+  const handleSpotifyLogin = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'spotify',
+      options: {
+        scopes:
+          'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
+        redirectTo: 'https://deafco.vercel.app/dashboard',
+      },
+    })
+
+    if (error) {
+      console.error('❌ Supabase login error:', error.message)
+    } else {
+      console.log('🔗 Redirecting to Spotify login...')
     }
-
-    const scopes = [
-      'user-read-email',
-      'user-read-private',
-      'user-read-playback-state',
-      'user-read-currently-playing',
-      'user-modify-playback-state',
-    ].join(' ')
-
-    const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&scope=${encodeURIComponent(
-      scopes
-    )}&redirect_uri=${encodeURIComponent(redirectUri)}`
-
-    console.log('🔗 Redirecting to Spotify OAuth:', authUrl)
-    window.location.href = authUrl
   }
 
   return (
