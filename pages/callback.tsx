@@ -19,7 +19,7 @@ export default function AfterLogin() {
             id: user.id,
             email: user.email,
             spotify_access_token: user.user_metadata?.spotify_access_token || null,
-          }, { onConflict: ['id'] })
+          }, { onConflict: 'id' })
 
         if (error) {
           console.error('Failed to upsert user:', error)
