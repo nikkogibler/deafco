@@ -1,23 +1,24 @@
 import React from 'react'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
+import { useRouter } from 'next/router'
 
 export default function Login() {
   const supabase = useSupabaseClient()
+  const router = useRouter()
 
   const handleSpotifyLogin = async () => {
-    // Initiating Supabase OAuth flow for Spotify
-    const { user, session, error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
         scopes:
           'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
-        redirectTo: 'https://deafco.vercel.app/dashboard', // Make sure it's this exact URL
+        redirectTo: 'https://deafco.vercel.app/dashboard', // Ensure it's this exact URL
       },
     })
 
     // Log the generated URL Supabase is using
-    if (session) {
-      console.log('🔗 Supabase generated OAuth URL:', session)
+    if (data) {
+      console.log('🔗 Supabase generated OAuth URL:', data.url)  // This will show the exact URL
     }
 
     if (error) {
