@@ -1,3 +1,12 @@
+console.log('🚀 Callback hit');
+console.log('ENV Vars:', {
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  spotifyClientId: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID,
+  spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET
+});
+
+
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { createClient } from '@supabase/supabase-js'
 
