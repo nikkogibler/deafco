@@ -5,7 +5,7 @@ import { SessionContextProvider } from '@supabase/auth-helpers-react'
 import '../styles/globals.css'
 
 export default function MyApp({ Component, pageProps }) {
-  const [supabase] = useState(() => createBrowserSupabaseClient())
+const [supabase] = useState(() => createPagesBrowserClient())
 
   return (
     <SessionContextProvider
