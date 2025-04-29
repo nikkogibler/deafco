@@ -15,12 +15,15 @@ export default function Login() {
       },
     })
 
-    if (error) {
-      console.error('❌ Supabase login error:', error.message)
-    } else {
-      console.log('🔗 Redirecting to Spotify login...')
-    }
+  // Log the generated URL Supabase is using
+  if (data) {
+    console.log('🔗 Supabase generated OAuth URL:', data.url)  // This logs the redirect URL Supabase is generating
   }
+
+  if (error) {
+    console.error('❌ Supabase login error:', error.message)
+  }
+}
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
