@@ -15,14 +15,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     const checkSession = async () => {
-      // If code is available in URL (Spotify redirected with code)
+      // 1. Check if the user is coming back with the `code` parameter
       if (router.query.code) {
+        console.log('💬 Spotify redirect code detected')
+
         const fetchAccessToken = async () => {
           const code = router.query.code as string
           const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
           const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
           const redirectUri = 'https://deafco.vercel.app/dashboard'
 
+          console.log('🔑 Exchanging code for access token...')
           // Exchange the authorization code for an access token from Spotify
           const response = await fetch('https://accounts.spotify.com/api/token', {
             method: 'POST',
@@ -40,9 +43,11 @@ export default function Dashboard() {
           })
 
           const data = await response.json()
+          console.log('🔑 Token response from Spotify:', data)
 
           if (data.access_token) {
-            // Store the access token and refresh token in Supabase
+            console.log('🎉 Access token received! Storing in Supabase...')
+            // Step 2: Store the access token and refresh token in Supabase
             await supabase
               .from('users')
               .upsert({
@@ -56,16 +61,17 @@ export default function Dashboard() {
             await fetchNowPlaying(data.access_token)
             await fetchDevices(data.access_token)
           } else {
-            console.error('Error fetching access token:', data)
+            console.error('❌ Error fetching access token:', data)
           }
         }
 
         fetchAccessToken()
       } else {
-        // If there's no code, we proceed with regular session checking
+        // 3. If there's no `code` in the URL, continue with session handling
         const { data, error } = await supabase.auth.getSession()
 
         if (!data?.session?.user) {
+          console.log('❌ No session found, redirecting to login...')
           window.location.href = '/login'  // Redirect to login if no session found
           return
         }
@@ -94,6 +100,7 @@ export default function Dashboard() {
         })
 
         if (res.status === 401 && refreshToken) {
+          console.log('🎯 Token expired, refreshing...')
           const refreshed = await fetch('/api/refresh', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
