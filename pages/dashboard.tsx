@@ -14,7 +14,7 @@ export default function Dashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    // First, check if we have a code in the URL (this would be from Spotify redirect)
+    // Handle Spotify OAuth code from the URL (redirected from Spotify after login)
     if (router.query.code) {
       const fetchAccessToken = async () => {
         const code = router.query.code as string
@@ -54,12 +54,14 @@ export default function Dashboard() {
           setAccessToken(data.access_token)
           await fetchNowPlaying(data.access_token)
           await fetchDevices(data.access_token)
+        } else {
+          console.error('Error getting access token:', data)
         }
       }
 
       fetchAccessToken()
     } else {
-      // If no code, proceed with session check
+      // Handle session when there's no code in the URL
       const checkSession = async () => {
         const { data, error } = await supabase.auth.getSession()
 
