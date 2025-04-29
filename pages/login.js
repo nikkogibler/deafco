@@ -44,7 +44,9 @@ export default function Login() {
         const redirectUri = encodeURIComponent('https://deafco.vercel.app/login')
         const scopes = encodeURIComponent('user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state')
 
-        window.location.href = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}`
+        window.location.href = `https://accounts.spotify.com/authorize?client_id=f2a8dfe8bd764c32a3b2f71b1d271ed9&response_type=token&redirect_uri=https%3A%2F%2Fdeafco.vercel.app%2Flogin
+&scope=user-read-email%20user-read-private%20user-read-playback-state%20user-read-currently-playing%20user-modify-playback-state
+`
       }
     }
 
