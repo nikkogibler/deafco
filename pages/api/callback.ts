@@ -1,14 +1,13 @@
-console.log('🚀 Callback hit');
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
+
+console.log('🚀 Callback hit')
 console.log('ENV Vars:', {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
   supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   spotifyClientId: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID,
-  spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET
-});
-
-
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { createClient } from '@supabase/supabase-js'
+  spotifyClientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+})
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,6 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const code = req.query.code as string
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!
+  const redirectUri = 'https://deafco.vercel.app/api/callback' // ✅ Moved here
 
   try {
     // Exchange code for Spotify access token
@@ -29,8 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-
-        const redirectUri = 'https://deafco.vercel.app/api/callback'
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
