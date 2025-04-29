@@ -1,42 +1,26 @@
-'use client'
-
-import { useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { useSession } from '@supabase/auth-helpers-react'
-import supabase from '@/utils/supabaseClient'
 
 export default function Login() {
   const router = useRouter()
-  const session = useSession()
 
-  useEffect(() => {
-    if (session?.user) {
-      router.push('/dashboard')
-      return
-    }
+  const handleSpotifyLogin = () => {
+    const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!
+    const redirectUri = encodeURIComponent('https://deafco.vercel.app/api/spotify/callback')
+    const scopes = encodeURIComponent('user-read-email user-read-private')
 
-    const signInWithSpotify = async () => {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'spotify',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          scopes:
-            'user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state',
-        },
-      })
+    const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&scope=${scopes}&redirect_uri=${redirectUri}`
 
-      if (error) {
-        console.error('Spotify login error:', error.message)
-      }
-    }
-
-    signInWithSpotify()
-  }, [session, router])
+    window.location.href = authUrl
+  }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
-      <h1 className="text-3xl font-bold mb-4">Redirecting to Spotify...</h1>
-      <p>If nothing happens, try refreshing the page.</p>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white">
+      <button
+        onClick={handleSpotifyLogin}
+        className="bg-green-500 px-6 py-3 rounded-lg text-lg font-semibold"
+      >
+        Login with Spotify
+      </button>
     </div>
   )
 }
