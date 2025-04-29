@@ -5,7 +5,7 @@ export default function Login() {
 
   const handleSpotifyLogin = () => {
     const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!
-    const redirectUri = encodeURIComponent('https://deafco.vercel.app/api/spotify/callback')
+const redirectUri = encodeURIComponent('https://deafco.vercel.app/api/callback')
     const scopes = encodeURIComponent('user-read-email user-read-private')
 
     const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&scope=${scopes}&redirect_uri=${redirectUri}`
