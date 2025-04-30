@@ -113,7 +113,7 @@ export default function Dashboard() {
 
       // Try Now Playing
       const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${token} },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (res.status === 401 && refreshToken) {
