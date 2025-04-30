@@ -1,33 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
-
 export default function Login() {
-  const [supabase] = useState(() => createPagesBrowserClient())
+  const handleSpotifyLogin = () => {
+    const clientId = 'f2a8dfe8bd764c32a3b2f71b1d271ed9'
+    const redirectUri = 'https://deafco.vercel.app/dashboard'
+    const scopes = [
+      'user-read-email',
+      'user-read-private',
+      'user-read-playback-state',
+      'user-read-currently-playing',
+      'user-modify-playback-state',
+    ].join(' ')
 
-  const handleSpotifyLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'spotify',
-      options: {
-        scopes: [
-          'user-read-email',
-          'user-read-private',
-          'user-read-playback-state',
-          'user-read-currently-playing',
-          'user-modify-playback-state',
-        ].join(' '),
-        redirectTo: 'https://deafco.vercel.app/dashboard',
-        queryParams: {
-          response_type: 'code',        // ⬅️ CRITICAL for your manual token flow
-          show_dialog: 'true',          // ⬅️ Optional: forces Spotify login prompt
-        },
-      },
-    })
+    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&show_dialog=true`
 
-    if (error) {
-      console.error('❌ Spotify login failed:', error.message)
-    }
+    window.location.href = authUrl
   }
 
   return (
