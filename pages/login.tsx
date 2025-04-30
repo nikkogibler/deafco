@@ -17,12 +17,12 @@ export default function Login() {
           'user-read-currently-playing',
           'user-modify-playback-state',
         ].join(' '),
-        redirectTo: 'https://deafco.vercel.app/dashboard', // where Supabase sends the user *after login*
+        redirectTo: 'https://deafco.vercel.app/dashboard', // ← final destination after login
       },
     })
 
     if (error) {
-      console.error('❌ Spotify login error:', error.message)
+      console.error('❌ Spotify login failed:', error.message)
     }
   }
 
