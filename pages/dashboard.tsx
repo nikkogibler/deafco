@@ -16,13 +16,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+     const { data: { session } } = await supabase.auth.getSession()
 
-      if (!session?.user) {
-        console.log('❌ No session found, redirecting to login...')
-        router.push('/login')
-        return
-      }
+if (!session) {
+  console.log('⏳ Waiting for session to load...')
+  return // Wait for next useEffect cycle
+}
+
+if (!session.user) {
+  console.log('❌ No user found, redirecting to login...')
+  router.push('/login')
+  return
+}
+
 
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
