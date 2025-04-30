@@ -11,10 +11,7 @@ function AuthRedirectHandler() {
 
   useEffect(() => {
     if (!isLoading && session) {
-      const next = new URLSearchParams(window.location.search).get('next')
-      if (next) {
-        router.replace(next)
-      }
+  
     }
   }, [isLoading, session, router])
 
