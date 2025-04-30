@@ -25,24 +25,45 @@ export default function Dashboard() {
       }
 
       const user = session.user
+      console.log('✅ Authenticated session for:', user.email)
+
+      // 🔁 Ensure user is inserted into `users` table
+      const { error: insertError } = await supabase.from('users').upsert({
+        id: user.id,
+        email: user.email,
+        role: 'freemium', // default role
+      })
+
+      if (insertError) {
+        console.error('❌ Failed to upsert user row:', insertError.message)
+      } else {
+        console.log('✅ Upserted user row successfully')
+      }
+
       setUserEmail(user.email)
 
-      // Fetch Spotify tokens from Supabase
-      const { data: userData, error: userError } = await supabase
+      // 🎧 Fetch Spotify tokens from Supabase
+      const { data: userData, error: fetchError } = await supabase
         .from('users')
         .select('spotify_access_token, spotify_refresh_token')
         .eq('id', user.id)
         .single()
 
-      const token = userData?.spotify_access_token
-      const refreshToken = userData?.spotify_refresh_token
-
-      if (!token) {
+      if (fetchError) {
+        console.error('❌ Could not fetch tokens:', fetchError.message)
         setLoading(false)
         return
       }
 
+      const token = userData?.spotify_access_token
+      const refreshToken = userData?.spotify_refresh_token
       setAccessToken(token)
+
+      if (!token) {
+        console.warn('⚠️ No Spotify access token stored yet')
+        setLoading(false)
+        return
+      }
 
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${token}` },
@@ -100,12 +121,11 @@ export default function Dashboard() {
   }
 
   const handleLogout = async () => {
-await supabase.auth.signOut()
-localStorage.clear()
-sessionStorage.clear()
-document.cookie = ''
-router.push('/login')
-
+    await supabase.auth.signOut()
+    localStorage.clear()
+    sessionStorage.clear()
+    document.cookie = ''
+    router.push('/login')
   }
 
   if (loading) {
@@ -118,7 +138,6 @@ router.push('/login')
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-40" style={{ backgroundColor: '#141b24', color: 'white' }}>
-
       <div className="absolute top-8">
         <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={480} height={120} />
       </div>
