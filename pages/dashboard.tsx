@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -16,6 +15,8 @@ export default function Dashboard() {
   const router = useRouter()
 
   useEffect(() => {
+    if (!router.isReady) return
+
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
 
@@ -27,12 +28,14 @@ export default function Dashboard() {
 
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
+      console.log('🌐 Router query at load:', router.query)
 
       // 🌐 Check for ?code=... and exchange it via secure API
       if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
-  window.sessionStorage.setItem('spotify_code_used', 'true')
+        window.sessionStorage.setItem('spotify_code_used', 'true')
 
         const code = router.query.code as string
+        console.log('🎯 Code detected from URL:', code)
 
         const tokenResponse = await fetch('/api/spotify-token', {
           method: 'POST',
@@ -143,7 +146,7 @@ export default function Dashboard() {
     }
 
     checkSession()
-  }, [router])
+  }, [router.isReady])
 
   const fetchNowPlaying = async (token: string) => {
     const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
