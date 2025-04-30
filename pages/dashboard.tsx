@@ -27,11 +27,46 @@ export default function Dashboard() {
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
 
+      // 🌐 Check for ?code=... and exchange it for Spotify tokens
+      if (router.query.code) {
+        const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+        const clientSecret = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_SECRET
+        const redirectUri = 'https://deafco.vercel.app/dashboard'
+        const code = router.query.code as string
+
+        const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + btoa(`${clientId}:${clientSecret}`),
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirectUri,
+          }),
+        })
+
+        const tokenData = await tokenResponse.json()
+        console.log('🎧 Spotify token response:', tokenData)
+
+        if (tokenData.access_token && tokenData.refresh_token) {
+          await supabase.from('users').update({
+            spotify_access_token: tokenData.access_token,
+            spotify_refresh_token: tokenData.refresh_token,
+            token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+          }).eq('id', user.id)
+
+          setAccessToken(tokenData.access_token)
+          router.replace('/dashboard')
+        }
+      }
+
       // 🔁 Ensure user is inserted into `users` table
       const { error: insertError } = await supabase.from('users').upsert({
         id: user.id,
         email: user.email,
-        role: 'freemium', // default role
+        role: 'freemium',
       })
 
       if (insertError) {
