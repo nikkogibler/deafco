@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import supabase from '@/utils/supabaseClient'
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
 import { useRouter } from 'next/router'
 
@@ -11,119 +11,67 @@ export default function Dashboard() {
   const [nowPlaying, setNowPlaying] = useState<any | null>(null)
   const [devices, setDevices] = useState<any[]>([])
   const [accessToken, setAccessToken] = useState<string | null>(null)
+  const supabase = createPagesBrowserClient()
   const router = useRouter()
 
   useEffect(() => {
     const checkSession = async () => {
-      // 1. Check if the user is coming back with the `code` parameter
-      if (router.query.code) {
-        console.log('💬 Spotify redirect code detected')
+      const { data: { session }, error } = await supabase.auth.getSession()
 
-        const fetchAccessToken = async () => {
-          const code = router.query.code as string
-          const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
-          const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-          const redirectUri = 'https://deafco.vercel.app/dashboard'
-
-          console.log('🔑 Exchanging code for access token...')
-          // Exchange the authorization code for an access token from Spotify
-          const response = await fetch('https://accounts.spotify.com/api/token', {
-            method: 'POST',
-            headers: {
-              Authorization:
-                'Basic ' +
-                Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              grant_type: 'authorization_code',
-              code: code,
-              redirect_uri: redirectUri,
-            }),
-          })
-
-          const data = await response.json()
-          console.log('🔑 Token response from Spotify:', data)
-
-          if (data.access_token) {
-            console.log('🎉 Access token received! Storing in Supabase...')
-            // Step 2: Store the access token and refresh token in Supabase
-            await supabase
-              .from('users')
-              .upsert({
-                spotify_access_token: data.access_token,
-                spotify_refresh_token: data.refresh_token,
-                token_expires_at: new Date(Date.now() + data.expires_in * 1000), // Expires in seconds
-              })
-              .eq('id', data.id)
-
-            setAccessToken(data.access_token)
-            await fetchNowPlaying(data.access_token)
-            await fetchDevices(data.access_token)
-          } else {
-            console.error('❌ Error fetching access token:', data)
-          }
-        }
-
-        fetchAccessToken()
-      } else {
-        // 3. If there's no `code` in the URL, continue with session handling
-        const { data, error } = await supabase.auth.getSession()
-
-        if (!data?.session?.user) {
-          console.log('❌ No session found, redirecting to login...')
-          window.location.href = '/login'  // Redirect to login if no session found
-          return
-        }
-
-        const user = data.session.user
-        setUserEmail(user.email)
-
-        // Fetch the stored tokens from Supabase
-        const { data: userData } = await supabase
-          .from('users')
-          .select('spotify_access_token, spotify_refresh_token')
-          .eq('id', user.id)
-          .single()
-
-        const token = userData?.spotify_access_token
-        const refreshToken = userData?.spotify_refresh_token
-        setAccessToken(token)
-
-        if (!token) {
-          setLoading(false)
-          return
-        }
-
-        const res = await fetch('https://api.spotify.com/v1/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        if (res.status === 401 && refreshToken) {
-          console.log('🎯 Token expired, refreshing...')
-          const refreshed = await fetch('/api/refresh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refresh_token: refreshToken }),
-          }).then(r => r.json())
-
-          if (refreshed.access_token) {
-            await supabase
-              .from('users')
-              .update({ spotify_access_token: refreshed.access_token })
-              .eq('id', user.id)
-
-            setAccessToken(refreshed.access_token)
-            await fetchNowPlaying(refreshed.access_token)
-            await fetchDevices(refreshed.access_token)
-          }
-        } else {
-          await fetchNowPlaying(token)
-          await fetchDevices(token)
-        }
-
-        setLoading(false)
+      if (!session?.user) {
+        console.log('❌ No session found, redirecting to login...')
+        router.push('/login')
+        return
       }
+
+      const user = session.user
+      setUserEmail(user.email)
+
+      // Fetch Spotify tokens from Supabase
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('spotify_access_token, spotify_refresh_token')
+        .eq('id', user.id)
+        .single()
+
+      const token = userData?.spotify_access_token
+      const refreshToken = userData?.spotify_refresh_token
+
+      if (!token) {
+        setLoading(false)
+        return
+      }
+
+      setAccessToken(token)
+
+      const res = await fetch('https://api.spotify.com/v1/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (res.status === 401 && refreshToken) {
+        console.log('🎯 Token expired, refreshing...')
+        const refreshed = await fetch('/api/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        }).then(r => r.json())
+
+        if (refreshed.access_token) {
+          await supabase
+            .from('users')
+            .update({ spotify_access_token: refreshed.access_token })
+            .eq('id', user.id)
+
+          setAccessToken(refreshed.access_token)
+          await fetchNowPlaying(refreshed.access_token)
+          await fetchDevices(refreshed.access_token)
+        }
+      } else {
+        await fetchNowPlaying(token)
+        await fetchDevices(token)
+      }
+
+      setLoading(false)
     }
 
     checkSession()
@@ -170,12 +118,10 @@ export default function Dashboard() {
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-40" style={{ backgroundColor: '#141b24', color: 'white' }}>
 
-      {/* SonicSuite Logo at the top center */}
       <div className="absolute top-8">
         <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={480} height={120} />
       </div>
 
-      {/* Spotify White Logo at the top-right corner */}
       <div className="absolute top-8 right-8">
         <Image src="/spotify-logo.png" alt="Spotify" width={40} height={40} />
       </div>
