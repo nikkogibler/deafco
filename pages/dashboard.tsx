@@ -28,7 +28,9 @@ export default function Dashboard() {
       console.log('✅ Authenticated session for:', user.email)
 
       // 🌐 Check for ?code=... and exchange it via secure API
-      if (router.query.code) {
+      if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
+  window.sessionStorage.setItem('spotify_code_used', 'true')
+
         const code = router.query.code as string
 
         const tokenResponse = await fetch('/api/spotify-token', {
