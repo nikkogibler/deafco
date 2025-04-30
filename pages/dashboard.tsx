@@ -40,16 +40,24 @@ if (router.query.code) {
   const tokenData = await tokenResponse.json()
   console.log('🎧 Spotify token response (via API):', tokenData)
 
-  if (tokenData.access_token && tokenData.refresh_token) {
+if (tokenData.access_token && tokenData.refresh_token) {
+  const { data: freshSession } = await supabase.auth.getSession()
+  const freshUserId = freshSession?.session?.user?.id
+
+  if (!freshUserId) {
+    console.error('❌ No valid session found during token save')
+  } else {
     await supabase.from('users').update({
       spotify_access_token: tokenData.access_token,
       spotify_refresh_token: tokenData.refresh_token,
       token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-    }).eq('id', session.user.id)
+    }).eq('id', freshUserId)
 
     setAccessToken(tokenData.access_token)
-    router.replace('/dashboard') // Clean up the URL
+    router.replace('/dashboard')
   }
+}
+
 }
 
 
