@@ -1,13 +1,13 @@
 'use client'
 
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
 import { useState } from 'react'
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
 
 export default function Login() {
   const [supabase] = useState(() => createPagesBrowserClient())
 
   const handleSpotifyLogin = async () => {
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'spotify',
       options: {
         scopes: [
@@ -17,9 +17,13 @@ export default function Login() {
           'user-read-currently-playing',
           'user-modify-playback-state',
         ].join(' '),
-        redirectTo: 'https://deafco.vercel.app/dashboard' // ✅ final destination
+        redirectTo: 'https://deafco.vercel.app/dashboard', // where Supabase sends the user *after login*
       },
     })
+
+    if (error) {
+      console.error('❌ Spotify login error:', error.message)
+    }
   }
 
   return (
