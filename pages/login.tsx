@@ -1,25 +1,25 @@
-import React from 'react'
-import { useRouter } from 'next/router'
+'use client'
+
+import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
+import { useEffect, useState } from 'react'
 
 export default function Login() {
-  const router = useRouter()
+  const [supabase] = useState(() => createPagesBrowserClient())
 
-  const handleSpotifyLogin = () => {
-    const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
-    const redirectUri = 'https://deafco.vercel.app/dashboard'
-    const scopes = [
-      'user-read-email',
-      'user-read-private',
-      'user-read-playback-state',
-      'user-read-currently-playing',
-      'user-modify-playback-state',
-    ].join(' ')
-
-    // Construct the Spotify OAuth URL
-    const authUrl = `https://accounts.spotify.com/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`
-    
-    // Redirect to Spotify for login
-    window.location.href = authUrl
+  const handleSpotifyLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'spotify',
+      options: {
+        scopes: [
+          'user-read-email',
+          'user-read-private',
+          'user-read-playback-state',
+          'user-read-currently-playing',
+          'user-modify-playback-state',
+        ].join(' '),
+        redirectTo: 'https://deafco.vercel.app/dashboard',
+      },
+    })
   }
 
   return (
