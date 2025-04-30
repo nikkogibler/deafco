@@ -1,7 +1,7 @@
 'use client'
 
 import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export default function Login() {
   const [supabase] = useState(() => createPagesBrowserClient())
@@ -17,7 +17,7 @@ export default function Login() {
           'user-read-currently-playing',
           'user-modify-playback-state',
         ].join(' '),
-        redirectTo: 'https://deafco.vercel.app/api/auth/callback?next=/dashboard',
+        redirectTo: 'https://deafco.vercel.app/dashboard' // ✅ final destination
       },
     })
   }
