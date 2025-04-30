@@ -20,14 +20,18 @@ export default function Dashboard() {
 
 if (!session) {
   console.log('⏳ Waiting for session to load...')
-  return // Wait for next useEffect cycle
+  setTimeout(checkSession, 200) // 🕒 try again in 200ms
+  return
 }
+
 
 if (!session.user) {
   console.log('❌ No user found, redirecting to login...')
   router.push('/login')
+  setLoading(false) // ⬅️ CRUCIAL: let the UI recover
   return
 }
+
 
 
       const user = session.user
