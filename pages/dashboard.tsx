@@ -100,11 +100,12 @@ export default function Dashboard() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    localStorage.clear()
-    sessionStorage.clear()
-    document.cookie = ''
-    window.location.href = '/login'
+await supabase.auth.signOut()
+localStorage.clear()
+sessionStorage.clear()
+document.cookie = ''
+router.push('/login')
+
   }
 
   if (loading) {
