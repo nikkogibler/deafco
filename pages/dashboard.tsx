@@ -15,34 +15,30 @@ export default function Dashboard() {
   const router = useRouter()
 
   useEffect(() => {
+    if (!router.isReady) return
+
     const checkSession = async () => {
-     const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
 
-if (!session) {
-  console.log('⏳ Waiting for session to load...')
-  setTimeout(checkSession, 200) // 🕒 try again in 200ms
-  return
-}
+      if (!session) {
+        console.log('⏳ Session not ready yet')
+        return
+      }
 
-
-if (!session.user) {
-  console.log('❌ No user found, redirecting to login...')
-  router.push('/login')
-  setLoading(false) // ⬅️ CRUCIAL: let the UI recover
-  return
-}
-
-
+      if (!session.user) {
+        console.log('❌ No user found, redirecting...')
+        router.push('/login')
+        setLoading(false)
+        return
+      }
 
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
 
-      // 🌐 Check for ?code=... and exchange it via secure API
       if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
-  window.sessionStorage.setItem('spotify_code_used', 'true')
+        window.sessionStorage.setItem('spotify_code_used', 'true')
 
         const code = router.query.code as string
-
         const tokenResponse = await fetch('/api/spotify-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -55,8 +51,6 @@ if (!session.user) {
         if (tokenData.access_token && tokenData.refresh_token) {
           const { data: freshSession } = await supabase.auth.getSession()
           const freshUserId = freshSession?.session?.user?.id
-
-          console.log('🧠 Trying to update user ID:', freshUserId)
 
           if (!freshUserId) {
             console.error('❌ No valid session found during token save')
@@ -82,7 +76,6 @@ if (!session.user) {
         }
       }
 
-      // Ensure user row exists
       const { error: insertError } = await supabase.from('users').upsert({
         id: user.id,
         email: user.email,
@@ -97,7 +90,6 @@ if (!session.user) {
 
       setUserEmail(user.email)
 
-      // Load tokens from Supabase
       const { data: userData, error: fetchError } = await supabase
         .from('users')
         .select('spotify_access_token, spotify_refresh_token')
@@ -120,7 +112,6 @@ if (!session.user) {
         return
       }
 
-      // Try Now Playing
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -152,7 +143,7 @@ if (!session.user) {
     }
 
     checkSession()
-  }, [router])
+  }, [router.isReady])
 
   const fetchNowPlaying = async (token: string) => {
     const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
