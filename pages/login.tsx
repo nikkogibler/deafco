@@ -17,7 +17,7 @@ export default function Login() {
           'user-read-currently-playing',
           'user-modify-playback-state',
         ].join(' '),
-        redirectTo: 'https://deafco.vercel.app/dashboard',
+        redirectTo: 'https://deafco.vercel.app/api/auth/callback',
       },
     })
   }
