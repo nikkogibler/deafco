@@ -1,5 +1,3 @@
-// /pages/api/spotify-token.ts
-
 
 export default async function handler(req, res) {
   const { code } = req.body
