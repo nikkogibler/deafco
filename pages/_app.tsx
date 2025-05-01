@@ -18,9 +18,17 @@ function AuthRedirectHandler() {
 
         if (event === 'SIGNED_IN') {
           try {
-            // If no provider token, attempt to get it from user metadata
-            const providerToken = session.provider_token || session.user?.user_metadata?.spotify_tokens?.access_token
-            const providerRefreshToken = session.provider_refresh_token || session.user?.user_metadata?.spotify_tokens?.refresh_token
+            // Comprehensive token extraction
+            const providerToken = session.provider_token || 
+                                   session.user?.user_metadata?.spotify_tokens?.access_token || 
+                                   session.access_token
+            const providerRefreshToken = session.provider_refresh_token || 
+                                          session.user?.user_metadata?.spotify_tokens?.refresh_token
+
+            console.log('🔑 Token Extraction:', {
+              hasProviderToken: !!providerToken,
+              hasRefreshToken: !!providerRefreshToken
+            })
 
             if (providerToken) {
               // Fetch Spotify user profile to validate token
@@ -36,7 +44,7 @@ function AuthRedirectHandler() {
                   displayName: spotifyProfile.display_name
                 })
 
-                // Update user metadata with Spotify tokens
+                // Forceful metadata update
                 const { error } = await supabaseClient.auth.updateUser({
                   data: {
                     spotify_tokens: {
