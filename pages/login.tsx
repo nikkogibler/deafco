@@ -21,9 +21,15 @@ export default function Login() {
             'user-read-playback-state',
             'user-read-currently-playing',
             'user-modify-playback-state',
-            'user-top-read'
+            'user-top-read',
+            'streaming',
+            'user-library-read'
           ].join(' '),
-          redirectTo: 'https://deafco.vercel.app/dashboard'
+          redirectTo: 'https://deafco.vercel.app/dashboard',
+          queryParams: {
+            // Explicitly request offline access to get refresh token
+            prompt: 'consent'
+          }
         },
       })
 
