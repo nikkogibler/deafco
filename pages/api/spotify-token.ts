@@ -54,29 +54,52 @@ export default async function handler(
   }
 
   // Log full request details for debugging
-  console.log('Incoming Request:', {
+  console.log('Incoming Request Full Details:', {
     method: req.method,
     body: req.body,
     query: req.query,
     rawBody: req.body,
-    headers: {
-      'content-type': req.headers['content-type'],
-      'user-agent': req.headers['user-agent']
-    }
+    headers: req.headers,
+    contentType: req.headers['content-type'],
+    rawHeaders: Object.keys(req.headers).reduce((acc, key) => {
+      acc[key] = req.headers[key]
+      return acc
+    }, {} as Record<string, string | string[] | undefined>)
   })
 
   // Parse request body with extra safety
   let parsedBody: TokenRequestBody
   try {
-    parsedBody = typeof req.body === 'string' 
-      ? JSON.parse(req.body) 
-      : req.body as TokenRequestBody
+    // Try multiple parsing strategies
+    if (typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body)
+      } catch {
+        // If JSON parsing fails, try treating as already parsed
+        parsedBody = JSON.parse(JSON.stringify(req.body))
+      }
+    } else if (typeof req.body === 'object') {
+      parsedBody = req.body as TokenRequestBody
+    } else {
+      throw new Error('Unsupported body type')
+    }
+
+    console.log('Parsed Body:', {
+      bodyType: typeof parsedBody,
+      code: parsedBody.code ? 'Present' : 'Missing',
+      user_id: parsedBody.user_id ? 'Present' : 'Missing'
+    })
   } catch (parseError) {
-    console.error('❌ Failed to parse request body', parseError)
+    console.error('❌ Failed to parse request body', {
+      originalBody: req.body,
+      bodyType: typeof req.body,
+      parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+    })
     return res.status(400).json({
       error: 'Invalid request body',
       details: { 
         originalBody: req.body,
+        bodyType: typeof req.body,
         parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
       }
     })
