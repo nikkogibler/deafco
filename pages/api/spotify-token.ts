@@ -63,23 +63,66 @@ export default async function handler(
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const redirectUri = 'https://deafco.vercel.app/dashboard'
+  // Define possible redirect URIs
+  const possibleRedirectUris = [
+    'https://deafco.vercel.app/dashboard',
+    'https://mnrupunmtyrlztkziqhm.supabase.co/auth/v1/callback'
+  ]
 
   // Validate environment variables
   if (!clientId || !clientSecret || !supabaseUrl || !supabaseServiceKey) {
-    return res.status(500).json({ error: 'Server configuration error' })
+    console.error('❌ Missing Critical Environment Variables', {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      hasSupabaseUrl: !!supabaseUrl,
+      hasSupabaseServiceKey: !!supabaseServiceKey
+    })
+    return res.status(500).json({ 
+      error: 'Server configuration error',
+      details: {
+        missingVariables: {
+          clientId: !clientId,
+          clientSecret: !clientSecret,
+          supabaseUrl: !supabaseUrl,
+          supabaseServiceKey: !supabaseServiceKey
+        }
+      }
+    })
   }
 
+  // Log all possible redirect URIs for debugging
+  console.log('🌐 Possible Redirect URIs', {
+    configuredUris: possibleRedirectUris
+  })
+
   try {
-    // Spotify token exchange
-    console.log('🔐 Spotify Token Exchange Attempt', {
-      clientIdPresent: !!clientId,
-      clientSecretPresent: !!clientSecret,
+    // Comprehensive logging of all relevant environment and request details
+    console.log('🔐 Spotify Token Exchange Diagnostic Info', {
+      // Environment Variables
+      clientIdLength: clientId?.length || 0,
+      clientSecretLength: clientSecret?.length || 0,
+      supabaseUrlPresent: !!supabaseUrl,
+      
+      // Request Details
       redirectUri,
       codeLength: code.length,
-      codeFirstChars: code.slice(0, 10) + '...'
+      codeFirstChars: code.slice(0, 10) + '...',
+      
+      // Vercel-specific context
+      vercelUrl: process.env.VERCEL_URL,
+      nodeEnv: process.env.NODE_ENV,
+      deploymentUrl: process.env.DEPLOYMENT_URL
     })
 
+    // Dynamically determine the correct redirect URI
+    const effectiveRedirectUri = possibleRedirectUris[0] // Default to first URI
+
+    console.log('🌐 Redirect URI Details', {
+      possibleUris: possibleRedirectUris,
+      effectiveUri: effectiveRedirectUri
+    })
+
+    // Spotify token exchange with enhanced error handling
     const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -89,17 +132,35 @@ export default async function handler(
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        redirect_uri: redirectUri,
+        redirect_uri: effectiveRedirectUri,
       }),
     })
 
-    const tokenData = await response.json()
+    // Capture raw response text for more detailed logging
+    const responseText = await response.text()
+    let tokenData;
+    try {
+      tokenData = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('❌ Failed to parse Spotify response', {
+        rawResponse: responseText,
+        parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      })
+      return res.status(500).json({
+        error: 'Failed to parse Spotify response',
+        details: { rawResponse: responseText }
+      })
+    }
 
     // Detailed logging for token exchange response
     console.log('🎵 Spotify Token Exchange Response', {
       status: response.status,
       ok: response.ok,
-      responseBody: JSON.stringify(tokenData).slice(0, 500) // Limit log size
+      responseBody: JSON.stringify(tokenData).slice(0, 500), // Limit log size
+      errorDetails: tokenData.error ? {
+        error: tokenData.error,
+        description: tokenData.error_description
+      } : null
     })
 
     // Validate token response
@@ -107,13 +168,15 @@ export default async function handler(
       console.error('❌ Spotify Token Exchange Failed', {
         status: response.status,
         errorType: tokenData.error,
-        errorDescription: tokenData.error_description
+        errorDescription: tokenData.error_description,
+        fullResponseText: responseText
       })
       return res.status(response.status).json({
         error: tokenData.error || 'Token exchange failed',
         details: {
           description: tokenData.error_description,
-          status: response.status
+          status: response.status,
+          fullResponse: responseText
         }
       })
     }
