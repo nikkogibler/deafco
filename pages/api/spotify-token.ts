@@ -35,6 +35,11 @@ interface ErrorDetails {
   missingClientSecret?: boolean
   codeLength?: number
   user_idLength?: number
+  spotifyResponseStatus?: number
+  spotifyResponseText?: string
+  supabaseError?: string
+  errorMessage?: string
+  userId?: string
 }
 
 interface ErrorResponse {
@@ -186,25 +191,80 @@ export default async function handler(
     codeLength: code?.length,
     user_idLength: user_id?.length
   })
-    clientIdLength: clientId?.length,
-    clientSecretLength: clientSecret?.length
-  })
 
-  if (!clientId || !clientSecret) {
-    console.error('❌ Critical: Missing Spotify credentials', {
-      clientIdStatus: clientId ? 'Present' : 'Missing',
-      clientSecretStatus: clientSecret ? 'Present' : 'Missing'
+  try {
+    // Spotify token exchange request
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri
+      })
     })
-    return res.status(500).json({ 
-      error: 'Missing Spotify credentials', 
-      details: {
-        clientId: !!clientId,
-        clientSecret: !!clientSecret,
-        environment: {
-          NODE_ENV: process.env.NODE_ENV,
-          VERCEL: process.env.VERCEL,
-          VERCEL_ENV: process.env.VERCEL_ENV
+
+    // Check token exchange response
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text()
+      console.error('❌ Spotify Token Exchange Failed', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        errorText
+      })
+      return res.status(400).json({
+        error: 'Failed to exchange token',
+        details: {
+          spotifyResponseStatus: tokenResponse.status,
+          spotifyResponseText: errorText
         }
+      })
+    }
+
+    // Parse token response
+    const tokenData: SpotifyTokenResponse = await tokenResponse.json()
+
+    // Initialize Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Update user with Spotify tokens
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ 
+        spotify_access_token: tokenData.access_token,
+        spotify_refresh_token: tokenData.refresh_token,
+        spotify_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000)
+      })
+      .eq('id', user_id)
+
+    if (updateError) {
+      console.error('❌ Failed to update user tokens', updateError)
+      return res.status(500).json({
+        error: 'Failed to save tokens',
+        details: {
+          supabaseError: updateError.message,
+          userId: user_id
+        }
+      })
+    }
+
+    // Return successful token response
+    return res.status(200).json(tokenData)
+
+  } catch (error) {
+    console.error('❌ Unexpected Token Exchange Error', error)
+    return res.status(500).json({
+      error: 'Unexpected error during token exchange',
+      details: {
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        code: code ? 'Present' : 'Missing',
+        user_id: user_id ? 'Present' : 'Missing'
       }
     })
   }
