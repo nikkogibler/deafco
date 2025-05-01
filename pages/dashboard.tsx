@@ -28,47 +28,14 @@ export default function Dashboard() {
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
 
-      // 🌐 Check for ?code=... and exchange it via secure API
-      if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
-  window.sessionStorage.setItem('spotify_code_used', 'true')
+      // 🌐 Fetch Spotify tokens from Supabase user metadata
+      const spotifyTokens = session.user.user_metadata.spotify_tokens
 
-        const code = router.query.code as string
-
-        const tokenResponse = await fetch('/api/spotify-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            code, 
-            user_id: session.user.id 
-          }),
-        })
-
-        const tokenData = await tokenResponse.json()
-        console.log('🎧 Spotify token response (via API):', tokenData)
-
-        if (tokenData.access_token && tokenData.refresh_token) {
-          // Save tokens via dedicated API endpoint
-          const tokenSaveResponse = await fetch('/api/save-tokens', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              user_id: session.user.id,
-              access_token: tokenData.access_token,
-              refresh_token: tokenData.refresh_token,
-              expires_in: tokenData.expires_in
-            })
-          })
-
-          const saveResult = await tokenSaveResponse.json()
-
-          if (tokenSaveResponse.ok) {
-            console.log('✅ Spotify tokens saved successfully')
-            setAccessToken(tokenData.access_token)
-          } else {
-            console.error('❌ Failed to save Spotify tokens:', saveResult.error)
-          }
-        }
-        router.replace('/dashboard')
+      if (spotifyTokens) {
+        setAccessToken(spotifyTokens.access_token)
+        console.log('✅ Spotify tokens loaded from user metadata')
+      } else {
+        console.warn('⚠️ No Spotify tokens found in user metadata')
       }
 
       // Ensure user row exists
