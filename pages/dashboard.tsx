@@ -40,7 +40,8 @@ export default function Dashboard() {
  //REMOVE THIS IF IT BREAKS THE FLOW
 
         
-const { error: exchangeError } = await supabase.auth.exchangeCodeForSession()
+const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href)
+
   if (exchangeError) {
     console.error('❌ Failed to exchange code:', exchangeError.message)
     return
