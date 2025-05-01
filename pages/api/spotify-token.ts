@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       .update({ 
         spotify_access_token: tokenData.access_token,
         spotify_refresh_token: tokenData.refresh_token,
-        spotify_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000)
+        spotify_token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
       })
       .eq('id', userId)
 
