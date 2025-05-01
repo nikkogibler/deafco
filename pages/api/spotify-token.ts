@@ -13,22 +13,29 @@ interface SpotifyTokenResponse {
   expires_in: number
 }
 
+interface ErrorDetails {
+  clientId?: boolean
+  clientSecret?: boolean
+  environment?: {
+    NODE_ENV?: string
+    VERCEL?: string
+    VERCEL_ENV?: string
+  }
+  responseStatus?: number
+  responseBody?: any
+  message?: string
+}
+
 interface ErrorResponse {
   error: string
-  details?: {
-    clientId?: boolean
-    clientSecret?: boolean
-    environment?: {
-      NODE_ENV?: string
-      VERCEL?: string
-      VERCEL_ENV?: string
-    }
-  }
+  details?: ErrorDetails
 }
+
+type TokenExchangeResponse = SpotifyTokenResponse | ErrorResponse
 
 export default async function handler(
   req: NextApiRequest, 
-  res: NextApiResponse<SpotifyTokenResponse | ErrorResponse>
+  res: NextApiResponse<TokenExchangeResponse>
 ) {
   const { code, user_id } = req.body as TokenRequestBody
 
@@ -89,39 +96,49 @@ export default async function handler(
       statusText: response.statusText
     })
 
-    const tokenData = await response.json()
+    const rawTokenData = await response.json()
 
-    console.log('Raw Token Response:', tokenData)
+    console.log('Raw Token Response:', rawTokenData)
 
     if (!response.ok) {
       console.error('❌ Token Exchange Failed:', {
         status: response.status,
-        body: tokenData
+        body: rawTokenData
       })
       return res.status(400).json({ 
         error: 'Failed to exchange token', 
         details: {
           responseStatus: response.status,
-          responseBody: tokenData
+          responseBody: rawTokenData
         }
       })
     }
 
     // Validate token response
+    const tokenData: SpotifyTokenResponse = {
+      access_token: rawTokenData.access_token,
+      refresh_token: rawTokenData.refresh_token,
+      expires_in: rawTokenData.expires_in
+    }
+
     if (!tokenData.access_token || !tokenData.refresh_token) {
       console.error('❌ Invalid Token Response:', tokenData)
       return res.status(400).json({ 
         error: 'Invalid token response', 
-        details: tokenData 
+        details: {
+          responseBody: rawTokenData
+        }
       })
     }
 
-    return res.status(200).json(tokenData as SpotifyTokenResponse)
+    return res.status(200).json(tokenData)
   } catch (error) {
     console.error('🔥 Critical Token Exchange Error:', error)
     return res.status(500).json({ 
       error: 'Token exchange failed', 
-      details: error instanceof Error ? error.message : 'Unknown error' 
+      details: {
+        message: error instanceof Error ? error.message : 'Unknown error'
+      }
     })
   }
 
