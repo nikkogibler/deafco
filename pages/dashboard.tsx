@@ -37,40 +37,38 @@ export default function Dashboard() {
         const tokenResponse = await fetch('/api/spotify-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ 
+            code, 
+            user_id: session.user.id 
+          }),
         })
 
         const tokenData = await tokenResponse.json()
         console.log('🎧 Spotify token response (via API):', tokenData)
 
         if (tokenData.access_token && tokenData.refresh_token) {
-          const { data: freshSession } = await supabase.auth.getSession()
-          const freshUserId = freshSession?.session?.user?.id
+          // Save tokens via dedicated API endpoint
+          const tokenSaveResponse = await fetch('/api/save-tokens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: session.user.id,
+              access_token: tokenData.access_token,
+              refresh_token: tokenData.refresh_token,
+              expires_in: tokenData.expires_in
+            })
+          })
 
-          console.log('🧠 Trying to update user ID:', freshUserId)
+          const saveResult = await tokenSaveResponse.json()
 
-          if (!freshUserId) {
-            console.error('❌ No valid session found during token save')
+          if (tokenSaveResponse.ok) {
+            console.log('✅ Spotify tokens saved successfully')
+            setAccessToken(tokenData.access_token)
           } else {
-            const { error: tokenSaveError, data: savedData } = await supabase
-              .from('users')
-              .update({
-                spotify_access_token: tokenData.access_token,
-                spotify_refresh_token: tokenData.refresh_token,
-                token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-              })
-              .eq('id', freshUserId)
-              .select()
-
-            if (tokenSaveError) {
-              console.error('❌ Token save failed:', tokenSaveError.message)
-            } else {
-              console.log('✅ Spotify tokens saved:', savedData)
-              setAccessToken(tokenData.access_token)
-              router.replace('/dashboard')
-            }
+            console.error('❌ Failed to save Spotify tokens:', saveResult.error)
           }
         }
+        router.replace('/dashboard')
       }
 
       // Ensure user row exists
