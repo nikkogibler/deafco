@@ -44,45 +44,44 @@ export default function Dashboard() {
   }
 
   const tokenResponse = await fetch('/api/spotify-token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code }),
-  })
-
-  const tokenData = await tokenResponse.json()
-  console.log('🎧 Spotify token response (via API):', tokenData)
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ code }),
+})
+const tokenData = await tokenResponse.json()
+console.log('🎧 Spotify token response (via API):', tokenData)
 
   if (!tokenData?.access_token || !tokenData?.refresh_token) {
-    console.error('❌ Missing tokens from response — aborting')
-    return
-  }
+  console.error('❌ Missing tokens from response — aborting')
+  return
+}
 
-  const { data: freshSession } = await supabase.auth.getSession()
-  const freshUserId = freshSession?.session?.user?.id
-  console.log('🧠 Session user ID:', freshUserId)
+const { data: sessionData } = await supabase.auth.getSession()
+const userId = sessionData?.session?.user?.id
+console.log('🧠 Session user ID for token save:', userId)
 
-  if (!freshUserId) {
-    console.error('❌ No valid session found during token save')
-    return
-  }
+if (!userId) {
+  console.error('❌ No Supabase session found — cannot save tokens')
+  return
+}
 
-  const { error: tokenSaveError, data: savedData } = await supabase
-    .from('users')
-    .update({
-      spotify_access_token: tokenData.access_token,
-      spotify_refresh_token: tokenData.refresh_token,
-      token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-    })
-    .eq('id', freshUserId)
-    .select()
+const { error: tokenSaveError, data: savedData } = await supabase
+  .from('users')
+  .update({
+    spotify_access_token: tokenData.access_token,
+    spotify_refresh_token: tokenData.refresh_token,
+    token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+  })
+  .eq('id', userId)
+  .select()
 
-  if (tokenSaveError) {
-    console.error('❌ Token save failed:', tokenSaveError.message)
-  } else {
-    console.log('✅ Spotify tokens saved:', savedData)
-    setAccessToken(tokenData.access_token)
-    router.replace('/dashboard') // cleans up the URL
-  }
+if (tokenSaveError) {
+  console.error('❌ Token save failed:', tokenSaveError.message)
+} else {
+  console.log('✅ Spotify tokens saved for user:', userId)
+  setAccessToken(tokenData.access_token)
+  router.replace('/dashboard') // cleans up ?code= from URL
+}
 }
 
 
