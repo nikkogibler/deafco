@@ -16,29 +16,32 @@ function AuthRedirectHandler() {
       const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
         console.log('🔍 Auth State Change Event:', { event, hasProviderToken: !!session?.provider_token })
 
-        if (event === 'SIGNED_IN' && session?.provider_token) {
+        if (event === 'SIGNED_IN') {
           try {
-            // Fetch Spotify user profile to validate token
-            const spotifyResponse = await fetch('https://api.spotify.com/v1/me', {
-              headers: { Authorization: `Bearer ${session.provider_token}` }
-            })
+            // If no provider token, attempt to get it from user metadata
+            const providerToken = session.provider_token || session.user?.user_metadata?.spotify_tokens?.access_token
+            const providerRefreshToken = session.provider_refresh_token || session.user?.user_metadata?.spotify_tokens?.refresh_token
 
-            if (spotifyResponse.ok) {
-              const spotifyProfile = await spotifyResponse.json()
-
-              console.log('🌐 Spotify Profile:', {
-                id: spotifyProfile.id,
-                displayName: spotifyProfile.display_name
+            if (providerToken) {
+              // Fetch Spotify user profile to validate token
+              const spotifyResponse = await fetch('https://api.spotify.com/v1/me', {
+                headers: { Authorization: `Bearer ${providerToken}` }
               })
 
-              // Ensure we have both access and refresh tokens
-              if (session.provider_token && session.provider_refresh_token) {
+              if (spotifyResponse.ok) {
+                const spotifyProfile = await spotifyResponse.json()
+
+                console.log('🌐 Spotify Profile:', {
+                  id: spotifyProfile.id,
+                  displayName: spotifyProfile.display_name
+                })
+
                 // Update user metadata with Spotify tokens
                 const { error } = await supabaseClient.auth.updateUser({
                   data: {
                     spotify_tokens: {
-                      access_token: session.provider_token,
-                      refresh_token: session.provider_refresh_token,
+                      access_token: providerToken,
+                      refresh_token: providerRefreshToken,
                       expires_at: Date.now() + (3600 * 1000), // 1 hour from now
                       spotify_user_id: spotifyProfile.id
                     }
@@ -51,10 +54,10 @@ function AuthRedirectHandler() {
                   console.log('✅ Spotify tokens saved successfully')
                 }
               } else {
-                console.warn('⚠️ Missing provider tokens during auth state change')
+                console.warn('⚠️ Failed to fetch Spotify user profile')
               }
             } else {
-              console.warn('⚠️ Failed to fetch Spotify user profile')
+              console.warn('⚠️ No Spotify tokens available')
             }
           } catch (error) {
             console.error('❌ Error processing Spotify login:', error)
