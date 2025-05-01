@@ -57,6 +57,7 @@ interface ErrorDetails {
     nodeVersion?: string
     platform?: string
   }
+  requestMethod?: string
 }
 
 interface ErrorResponse {
@@ -455,7 +456,9 @@ export default async function handler(
     details: {
       message: error instanceof Error ? error.message : 'Unknown error',
       errorType: error instanceof Error ? error.constructor.name : 'Unknown Error',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requestMethod: req.method,
+      requestBody: req.body ? JSON.stringify(req.body).slice(0, 500) : 'No body'
     }
   })
   }
