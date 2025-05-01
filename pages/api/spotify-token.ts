@@ -40,6 +40,8 @@ interface ErrorDetails {
   supabaseError?: string
   errorMessage?: string
   userId?: string
+  code?: 'Present' | 'Missing'
+  user_id?: 'Present' | 'Missing'
 }
 
 interface ErrorResponse {
