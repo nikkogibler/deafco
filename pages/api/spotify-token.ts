@@ -72,6 +72,14 @@ export default async function handler(
 
   try {
     // Spotify token exchange
+    console.log('🔐 Spotify Token Exchange Attempt', {
+      clientIdPresent: !!clientId,
+      clientSecretPresent: !!clientSecret,
+      redirectUri,
+      codeLength: code.length,
+      codeFirstChars: code.slice(0, 10) + '...'
+    })
+
     const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -87,9 +95,27 @@ export default async function handler(
 
     const tokenData = await response.json()
 
+    // Detailed logging for token exchange response
+    console.log('🎵 Spotify Token Exchange Response', {
+      status: response.status,
+      ok: response.ok,
+      responseBody: JSON.stringify(tokenData).slice(0, 500) // Limit log size
+    })
+
     // Validate token response
     if (!response.ok) {
-      return res.status(response.status).json(tokenData)
+      console.error('❌ Spotify Token Exchange Failed', {
+        status: response.status,
+        errorType: tokenData.error,
+        errorDescription: tokenData.error_description
+      })
+      return res.status(response.status).json({
+        error: tokenData.error || 'Token exchange failed',
+        details: {
+          description: tokenData.error_description,
+          status: response.status
+        }
+      })
     }
 
     // Initialize Supabase client
