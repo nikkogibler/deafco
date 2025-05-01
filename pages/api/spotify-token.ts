@@ -131,6 +131,30 @@ export default async function handler(
       })
     }
 
+    // Initialize Supabase client
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Update user with Spotify tokens
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({
+        spotify_access_token: tokenData.access_token,
+        spotify_refresh_token: tokenData.refresh_token,
+        token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000)
+      })
+      .eq('id', user_id)
+
+    if (updateError) {
+      console.error('❌ Failed to save Spotify tokens:', updateError)
+      return res.status(500).json({ 
+        error: 'Failed to save tokens', 
+        details: { message: updateError.message } 
+      })
+    }
+
     return res.status(200).json(tokenData)
   } catch (error) {
     console.error('🔥 Critical Token Exchange Error:', error)
@@ -141,27 +165,4 @@ export default async function handler(
       }
     })
   }
-
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  // Update user with Spotify tokens
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({
-      spotify_access_token: tokenData.access_token,
-      spotify_refresh_token: tokenData.refresh_token,
-      token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000)
-    })
-    .eq('id', user_id)
-
-  if (updateError) {
-    console.error('❌ Failed to save Spotify tokens:', updateError)
-    return res.status(500).json({ error: 'Failed to save tokens' })
-  }
-
-  return res.status(200).json(tokenData)
 }
