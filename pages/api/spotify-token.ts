@@ -44,6 +44,19 @@ interface ErrorDetails {
   responseText?: string
   bodyKeys?: string[]
   requestBody?: any
+  errorType?: string
+  errorStack?: string
+  timestamp?: string
+  requestDetails?: {
+    method?: string
+    body?: string
+    headers?: string[]
+  }
+  runtimeContext?: {
+    timestamp?: string
+    nodeVersion?: string
+    platform?: string
+  }
 }
 
 interface ErrorResponse {
@@ -159,24 +172,38 @@ export default async function handler(
     headers: req.headers
   })
 
-  // Comprehensive environment variable logging
-  console.log('Full Environment:', {
+  // Comprehensive deployment and environment diagnostics
+  console.log('🔎 Deployment Environment Diagnostics', {
     NEXT_PUBLIC_SPOTIFY_CLIENT_ID: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ? 'Present' : 'Missing',
-    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ? 'Present' : 'Missing',
+    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ? 'Masked' : 'Missing',
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing',
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'Masked' : 'Missing',
     NODE_ENV: process.env.NODE_ENV,
     VERCEL: process.env.VERCEL,
-    VERCEL_ENV: process.env.VERCEL_ENV
+    VERCEL_ENV: process.env.VERCEL_ENV,
+    VERCEL_URL: process.env.VERCEL_URL,
+    DEPLOYMENT_CONTEXT: process.env.DEPLOYMENT_CONTEXT
   })
 
-  // Log the actual values (masked for security)
+  // Validate and prepare credentials
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
-  const redirectUri = 'https://deafco.vercel.app/dashboard'
+  const redirectUri = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}/dashboard` 
+    : 'https://deafco.vercel.app/dashboard'
 
-  console.log('Credentials Check:', {
-    clientId: clientId ? 'Present' : 'Missing',
-    clientSecret: clientSecret ? 'Masked' : 'Missing',
-    redirectUri: redirectUri
+  console.log('🔐 Credential Validation', {
+    clientIdLength: clientId?.length || 0,
+    clientSecretMasked: clientSecret ? '*'.repeat(clientSecret.length) : 'Missing',
+    resolvedRedirectUri: redirectUri,
+    deploymentUrl: process.env.VERCEL_URL
+  })
+
+  // Additional runtime context logging
+  console.log('💻 Runtime Context', {
+    timestamp: new Date().toISOString(),
+    processVersion: process.version,
+    platform: process.platform
   })
 
   // Validate credentials before proceeding
@@ -384,12 +411,30 @@ export default async function handler(
 
     return res.status(200).json(tokenData)
   } catch (error) {
-    console.error('🔥 Critical Token Exchange Error:', error)
-    return res.status(500).json({ 
-      error: 'Token exchange failed', 
-      details: {
-        message: error instanceof Error ? error.message : 'Unknown error'
-      }
-    })
+    // Enhanced error logging and diagnostics
+  console.error('🔥 Critical Token Exchange Error', {
+    errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+    errorMessage: error instanceof Error ? error.message : 'Unknown error',
+    errorStack: error instanceof Error ? error.stack : 'No stack trace',
+    requestDetails: {
+      method: req.method,
+      body: req.body ? JSON.stringify(req.body).slice(0, 500) : 'No body',
+      headers: Object.keys(req.headers)
+    },
+    runtimeContext: {
+      timestamp: new Date().toISOString(),
+      nodeVersion: process.version,
+      platform: process.platform
+    }
+  })
+
+  return res.status(500).json({ 
+    error: 'Token exchange failed', 
+    details: {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      errorType: error instanceof Error ? error.constructor.name : 'Unknown Error',
+      timestamp: new Date().toISOString()
+    }
+  })
   }
 }
