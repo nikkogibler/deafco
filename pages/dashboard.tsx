@@ -52,20 +52,23 @@ export default function Dashboard() {
           return
         }
 
-        const { error: saveError } = await supabase
-          .from('users')
-          .update({
-            spotify_access_token: tokenData.access_token,
-            spotify_refresh_token: tokenData.refresh_token,
-            token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-          })
-          .eq('id', userId)
+        const { data: tokenSaveData, error: saveError } = await supabase
+  .from('users')
+  .update({
+    spotify_access_token: tokenData.access_token,
+    spotify_refresh_token: tokenData.refresh_token,
+    token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+  })
+  .eq('id', userId)
+  .select()
 
-        if (saveError) {
-          console.error('❌ Failed to save tokens:', saveError.message)
-        } else {
-          console.log('✅ Spotify tokens saved successfully for user:', userId)
-        }
+if (saveError) {
+  console.error('❌ Failed to save tokens:', saveError.message)
+} else if (!tokenSaveData || tokenSaveData.length === 0) {
+  console.warn('⚠️ Update returned no data — likely blocked by RLS')
+} else {
+  console.log('✅ Tokens updated successfully:', tokenSaveData)
+}
 
         router.replace('/dashboard')
         return // prevent rest of checkSession from running early
