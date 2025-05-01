@@ -331,7 +331,7 @@ export default async function handler(
         timestamp: new Date().toISOString()
       }
     })
-      method: 'POST',
+      method: 'POST'
       headers: {
         Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
         'Content-Type': 'application/x-www-form-urlencoded',
