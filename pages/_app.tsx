@@ -6,14 +6,53 @@ import { useRouter } from 'next/router'
 import '@/styles/globals.css'
 
 function AuthRedirectHandler() {
+  const { supabaseClient } = useSessionContext()
   const { isLoading, session } = useSessionContext()
   const router = useRouter()
 
   useEffect(() => {
     if (!isLoading && session) {
-  
+      // Listen for auth state changes to capture Spotify tokens
+      const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.provider_token) {
+          try {
+            // Fetch Spotify user profile to validate token
+            const spotifyResponse = await fetch('https://api.spotify.com/v1/me', {
+              headers: { Authorization: `Bearer ${session.provider_token}` }
+            })
+
+            if (spotifyResponse.ok) {
+              const spotifyProfile = await spotifyResponse.json()
+
+              // Update user metadata with Spotify tokens
+              const { error } = await supabaseClient.auth.updateUser({
+                data: {
+                  spotify_tokens: {
+                    access_token: session.provider_token,
+                    refresh_token: session.provider_refresh_token,
+                    expires_at: Date.now() + (3600 * 1000), // 1 hour from now
+                    spotify_user_id: spotifyProfile.id
+                  }
+                }
+              })
+
+              if (error) {
+                console.error('Failed to save Spotify tokens:', error)
+              } else {
+                console.log('✅ Spotify tokens saved successfully')
+              }
+            }
+          } catch (error) {
+            console.error('Error processing Spotify login:', error)
+          }
+        }
+      })
+
+      return () => {
+        authListener.subscription.unsubscribe()
+      }
     }
-  }, [isLoading, session, router])
+  }, [isLoading, session, supabaseClient])
 
   return null
 }
