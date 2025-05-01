@@ -43,8 +43,14 @@ export default function Login() {
             'streaming',
             'user-library-read'
           ].join(' '),
-          redirectTo: window.location.origin + '/dashboard',
+          // Use Supabase's default callback
+          redirectTo: 'https://mnrupunmtyrlztkziqhm.supabase.co/auth/v1/callback',
           queryParams: {
+            // Add custom state to track origin
+            state: JSON.stringify({
+              origin: window.location.origin,
+              path: '/dashboard'
+            }),
             // Explicitly request offline access to get refresh token
             prompt: 'consent'
           }
@@ -85,4 +91,3 @@ export default function Login() {
     </div>
   )
 }
-
