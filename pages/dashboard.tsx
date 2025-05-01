@@ -29,6 +29,44 @@ export default function Dashboard() {
           return
         }
 
+        // ✅ Insert token fetch + save logic BEFORE redirect
+        const code = router.query.code as string
+        const tokenResponse = await fetch('/api/spotify-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        })
+        const tokenData = await tokenResponse.json()
+        console.log('🎧 Spotify token response:', tokenData)
+
+        if (!tokenData?.access_token || !tokenData?.refresh_token) {
+          console.error('❌ Missing tokens — aborting token save')
+          return
+        }
+
+        const { data: freshSession } = await supabase.auth.getSession()
+        const userId = freshSession?.session?.user?.id
+
+        if (!userId) {
+          console.error('❌ No user session — cannot save tokens')
+          return
+        }
+
+        const { error: saveError } = await supabase
+          .from('users')
+          .update({
+            spotify_access_token: tokenData.access_token,
+            spotify_refresh_token: tokenData.refresh_token,
+            token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+          })
+          .eq('id', userId)
+
+        if (saveError) {
+          console.error('❌ Failed to save tokens:', saveError.message)
+        } else {
+          console.log('✅ Spotify tokens saved successfully for user:', userId)
+        }
+
         router.replace('/dashboard')
         return // prevent rest of checkSession from running early
       }
@@ -43,7 +81,6 @@ export default function Dashboard() {
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
 
-      // Ensure user row exists
       const { error: insertError } = await supabase.from('users').upsert({
         id: user.id,
         email: user.email,
@@ -58,7 +95,6 @@ export default function Dashboard() {
 
       setUserEmail(user.email)
 
-      // Load tokens from Supabase
       const { data: userData, error: fetchError } = await supabase
         .from('users')
         .select('spotify_access_token, spotify_refresh_token')
@@ -81,7 +117,6 @@ export default function Dashboard() {
         return
       }
 
-      // Try Now Playing
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${token}` },
       })
