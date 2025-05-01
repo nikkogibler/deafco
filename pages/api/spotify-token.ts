@@ -31,6 +31,10 @@ interface ErrorDetails {
   codeType?: string
   userIdType?: string
   parseError?: string
+  missingClientId?: boolean
+  missingClientSecret?: boolean
+  codeLength?: number
+  user_idLength?: number
 }
 
 interface ErrorResponse {
@@ -147,6 +151,41 @@ export default async function handler(
   const redirectUri = 'https://deafco.vercel.app/dashboard'
 
   console.log('Credentials Check:', {
+    clientId: clientId ? 'Present' : 'Missing',
+    clientSecret: clientSecret ? 'Masked' : 'Missing',
+    redirectUri: redirectUri
+  })
+
+  // Validate credentials before proceeding
+  if (!clientId) {
+    console.error('❌ Missing Spotify Client ID')
+    return res.status(400).json({
+      error: 'Missing Spotify credentials',
+      details: { 
+        missingClientId: true,
+        environment: process.env
+      }
+    })
+  }
+
+  if (!clientSecret) {
+    console.error('❌ Missing Spotify Client Secret')
+    return res.status(400).json({
+      error: 'Missing Spotify credentials',
+      details: { 
+        missingClientSecret: true,
+        environment: process.env
+      }
+    })
+  }
+
+  // Log incoming token exchange details
+  console.log('Token Exchange Attempt:', {
+    code: code ? 'Present' : 'Missing',
+    user_id: user_id ? 'Present' : 'Missing',
+    codeLength: code?.length,
+    user_idLength: user_id?.length
+  })
     clientIdLength: clientId?.length,
     clientSecretLength: clientSecret?.length
   })
