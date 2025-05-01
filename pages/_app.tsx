@@ -14,6 +14,8 @@ function AuthRedirectHandler() {
     if (!isLoading && session) {
       // Listen for auth state changes to capture Spotify tokens
       const { data: authListener } = supabaseClient.auth.onAuthStateChange(async (event, session) => {
+        console.log('🔍 Auth State Change Event:', { event, hasProviderToken: !!session?.provider_token })
+
         if (event === 'SIGNED_IN' && session?.provider_token) {
           try {
             // Fetch Spotify user profile to validate token
@@ -24,26 +26,38 @@ function AuthRedirectHandler() {
             if (spotifyResponse.ok) {
               const spotifyProfile = await spotifyResponse.json()
 
-              // Update user metadata with Spotify tokens
-              const { error } = await supabaseClient.auth.updateUser({
-                data: {
-                  spotify_tokens: {
-                    access_token: session.provider_token,
-                    refresh_token: session.provider_refresh_token,
-                    expires_at: Date.now() + (3600 * 1000), // 1 hour from now
-                    spotify_user_id: spotifyProfile.id
-                  }
-                }
+              console.log('🌐 Spotify Profile:', {
+                id: spotifyProfile.id,
+                displayName: spotifyProfile.display_name
               })
 
-              if (error) {
-                console.error('Failed to save Spotify tokens:', error)
+              // Ensure we have both access and refresh tokens
+              if (session.provider_token && session.provider_refresh_token) {
+                // Update user metadata with Spotify tokens
+                const { error } = await supabaseClient.auth.updateUser({
+                  data: {
+                    spotify_tokens: {
+                      access_token: session.provider_token,
+                      refresh_token: session.provider_refresh_token,
+                      expires_at: Date.now() + (3600 * 1000), // 1 hour from now
+                      spotify_user_id: spotifyProfile.id
+                    }
+                  }
+                })
+
+                if (error) {
+                  console.error('❌ Failed to save Spotify tokens:', error)
+                } else {
+                  console.log('✅ Spotify tokens saved successfully')
+                }
               } else {
-                console.log('✅ Spotify tokens saved successfully')
+                console.warn('⚠️ Missing provider tokens during auth state change')
               }
+            } else {
+              console.warn('⚠️ Failed to fetch Spotify user profile')
             }
           } catch (error) {
-            console.error('Error processing Spotify login:', error)
+            console.error('❌ Error processing Spotify login:', error)
           }
         }
       })
