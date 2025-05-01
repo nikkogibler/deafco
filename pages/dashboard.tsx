@@ -18,18 +18,16 @@ export default function Dashboard() {
     if (!router.isReady) return
 
     const checkSession = async () => {
-      // ✅ Handle Spotify OAuth redirect BEFORE anything else
       if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
         console.log('🎯 Spotify redirect detected. Running session exchange...')
         window.sessionStorage.setItem('spotify_code_used', 'true')
 
-        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
-        if (error) {
-          console.error('❌ exchangeCodeForSession failed:', error.message)
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href)
+        if (exchangeError) {
+          console.error('❌ exchangeCodeForSession failed:', exchangeError.message)
           return
         }
 
-        // ✅ Insert token fetch + save logic BEFORE redirect
         const code = router.query.code as string
         const tokenResponse = await fetch('/api/spotify-token', {
           method: 'POST',
@@ -46,32 +44,40 @@ export default function Dashboard() {
 
         const { data: freshSession } = await supabase.auth.getSession()
         const userId = freshSession?.session?.user?.id
+        console.log('🧪 Supabase user ID:', userId)
 
-        if (!userId) {
-          console.error('❌ No user session — cannot save tokens')
-          return
+        const { data: confirmUserRow, error: rowFetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (rowFetchError) {
+          console.error('❌ No user row found before update:', rowFetchError.message)
+        } else {
+          console.log('✅ User row exists before update:', confirmUserRow)
         }
 
         const { data: tokenSaveData, error: saveError } = await supabase
-  .from('users')
-  .update({
-    spotify_access_token: tokenData.access_token,
-    spotify_refresh_token: tokenData.refresh_token,
-    token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-  })
-  .eq('id', userId)
-  .select()
+          .from('users')
+          .update({
+            spotify_access_token: tokenData.access_token,
+            spotify_refresh_token: tokenData.refresh_token,
+            token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+          })
+          .eq('id', userId)
+          .select()
 
-if (saveError) {
-  console.error('❌ Failed to save tokens:', saveError.message)
-} else if (!tokenSaveData || tokenSaveData.length === 0) {
-  console.warn('⚠️ Update returned no data — likely blocked by RLS')
-} else {
-  console.log('✅ Tokens updated successfully:', tokenSaveData)
-}
+        if (saveError) {
+          console.error('❌ Failed to save tokens:', saveError.message)
+        } else if (!tokenSaveData || tokenSaveData.length === 0) {
+          console.warn('⚠️ Update returned no data — likely blocked or no row')
+        } else {
+          console.log('✅ Spotify tokens saved successfully:', tokenSaveData)
+        }
 
         router.replace('/dashboard')
-        return // prevent rest of checkSession from running early
+        return
       }
 
       const { data: { session } } = await supabase.auth.getSession()
