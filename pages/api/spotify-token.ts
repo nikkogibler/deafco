@@ -71,6 +71,8 @@ export default async function handler(
   req: NextApiRequest, 
   res: NextApiResponse<TokenExchangeResponse>
 ) {
+  // Ensure proper async error handling
+  try {
   // Validate request method
   if (req.method !== 'POST') {
     console.error('❌ Invalid request method:', req.method)
@@ -322,18 +324,13 @@ export default async function handler(
 
   } catch (error) {
     console.error('❌ Unexpected Token Exchange Error', error)
-    return res.status(500).json({
-      error: 'Unexpected error during token exchange',
+    return res.status(500).json({ 
+      error: 'Token exchange failed', 
       details: {
         errorMessage: error instanceof Error ? error.message : 'Unknown error',
-        code: code ? 'Present' : 'Missing',
-        user_id: user_id ? 'Present' : 'Missing'
+        timestamp: new Date().toISOString()
       }
     })
-  }
-
-  try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
         Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
@@ -461,5 +458,14 @@ export default async function handler(
       requestBody: req.body ? JSON.stringify(req.body).slice(0, 500) : 'No body'
     }
   })
+  } catch (globalError) {
+    console.error('🚨 Unhandled Global Error in Spotify Token Exchange', globalError)
+    return res.status(500).json({
+      error: 'Unexpected server error',
+      details: {
+        message: globalError instanceof Error ? globalError.message : 'Unknown global error',
+        timestamp: new Date().toISOString()
+      }
+    })
   }
 }
