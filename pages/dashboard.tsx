@@ -43,21 +43,39 @@ export default function Dashboard() {
 
       setUserEmail(user.email)
 
-      // Comprehensive token retrieval
-      const spotifyTokens = user.user_metadata.spotify_tokens
+      // Comprehensive token retrieval and logging
+      const userMetadata = user.user_metadata || {}
+      const spotifyTokens = userMetadata.spotify_tokens
 
-      console.log('🔍 User Metadata Full:', user.user_metadata)
-
-      // Detailed token logging
-      console.log('🔑 Token Retrieval:', {
-        hasUserMetadata: !!user.user_metadata,
-        hasSpotifyTokens: !!spotifyTokens,
-        accessTokenPresent: !!spotifyTokens?.access_token,
-        refreshTokenPresent: !!spotifyTokens?.refresh_token
+      console.log('🔍 Full User Metadata:', {
+        metadata: userMetadata,
+        keys: Object.keys(userMetadata)
       })
 
-      if (!spotifyTokens || !spotifyTokens.access_token) {
-        console.warn('⚠️ No valid Spotify tokens found')
+      // Detailed token logging with comprehensive checks
+      const tokenLog = {
+        hasUserMetadata: !!userMetadata,
+        hasSpotifyTokens: !!spotifyTokens,
+        accessTokenPresent: !!spotifyTokens?.access_token,
+        refreshTokenPresent: !!spotifyTokens?.refresh_token,
+        tokenExpiresAt: spotifyTokens?.expires_at
+      }
+      console.log('🔑 Token Retrieval:', tokenLog)
+
+      // Determine if Spotify connection is needed
+      const needSpotifyConnection = (
+        !userMetadata || 
+        !spotifyTokens || 
+        !spotifyTokens.access_token
+      )
+
+      if (needSpotifyConnection) {
+        console.warn('⚠️ Spotify connection required', {
+          missingMetadata: !userMetadata,
+          missingTokens: !spotifyTokens,
+          missingAccessToken: !spotifyTokens?.access_token
+        })
+        
         setAccessToken(null)
         setLoading(false)
         return
@@ -191,16 +209,39 @@ export default function Dashboard() {
   // If user is authenticated but Spotify is not connected
   if (!accessToken) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col justify-center items-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-4">Connect Your Spotify</h1>
-          <p className="mb-6 text-gray-300">To use DeafCo, please connect your Spotify account</p>
-          <button
-            onClick={() => router.push('/login')}
-            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition duration-300"
-          >
-            Connect Spotify
-          </button>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col justify-center items-center p-4">
+        <div className="bg-gray-800 rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
+          <h1 className="text-3xl font-bold mb-4 text-green-400">Spotify Connection</h1>
+          
+          <div className="mb-6">
+            <p className="text-gray-300 mb-2">Hi {userEmail},</p>
+            <p className="text-gray-300">To unlock the full DeafCo experience, connect your Spotify account.</p>
+          </div>
+
+          <div className="space-y-4">
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 transform hover:scale-105"
+            >
+              Connect Spotify
+            </button>
+
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition duration-300 transform hover:scale-105"
+            >
+              Logout
+            </button>
+          </div>
+
+          <div className="mt-6 text-xs text-gray-500">
+            <p>Connecting Spotify allows you to:</p>
+            <ul className="list-disc list-inside text-left">
+              <li>View your current playback</li>
+              <li>See available devices</li>
+              <li>Control your Spotify experience</li>
+            </ul>
+          </div>
         </div>
       </div>
     )
