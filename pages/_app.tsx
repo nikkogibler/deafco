@@ -18,6 +18,19 @@ function AuthRedirectHandler() {
 
         if (event === 'SIGNED_IN') {
           try {
+            // Parse custom state if available
+            let redirectPath = '/dashboard'
+            try {
+              const stateParam = new URLSearchParams(window.location.search).get('state')
+              if (stateParam) {
+                const parsedState = JSON.parse(decodeURIComponent(stateParam))
+                redirectPath = parsedState.path || redirectPath
+                console.log('🌍 Parsed Redirect State:', parsedState)
+              }
+            } catch (stateError) {
+              console.warn('⚠️ Failed to parse state:', stateError)
+            }
+
             // Comprehensive token extraction
             const providerToken = session.provider_token || 
                                    session.user?.user_metadata?.spotify_tokens?.access_token || 
