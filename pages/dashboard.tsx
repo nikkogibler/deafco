@@ -113,7 +113,7 @@ export default function Dashboard() {
 
       // Try Now Playing
       const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: Bearer ${token} },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (res.status === 401 && refreshToken) {
@@ -147,7 +147,7 @@ export default function Dashboard() {
 
   const fetchNowPlaying = async (token: string) => {
     const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-      headers: { Authorization: Bearer ${token} },
+      headers: { Authorization: `Bearer ${token}` },
     })
 
     if (res.ok && res.status !== 204) {
@@ -160,7 +160,7 @@ export default function Dashboard() {
 
   const fetchDevices = async (token: string) => {
     const res = await fetch('https://api.spotify.com/v1/me/player/devices', {
-      headers: { Authorization: Bearer ${token} },
+      headers: { Authorization: `Bearer ${token}` },
     })
 
     const data = await res.json()
