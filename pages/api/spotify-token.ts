@@ -1,4 +1,4 @@
-
+// /pages/api/spotify-token.ts
 
 
 export default async function handler(req, res) {
@@ -7,11 +7,6 @@ export default async function handler(req, res) {
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   const redirectUri = 'https://deafco.vercel.app/dashboard'
-
-  console.log('🎯 Code:', code)
-console.log('🔐 Client ID exists:', !!clientId)
-console.log('🔐 Client Secret exists:', !!clientSecret)
-console.log('↩️ Redirect URI:', redirectUri)
 
   const response = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
