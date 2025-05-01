@@ -53,55 +53,69 @@ export default function Dashboard() {
 
       setUserEmail(user.email)
 
-      // Load tokens from Supabase
-      const { data: userData, error: fetchError } = await supabase
-        .from('users')
-        .select('spotify_access_token, spotify_refresh_token')
-        .eq('id', user.id)
-        .single()
+      // Retrieve Spotify tokens from user metadata
+      const spotifyTokens = user.user_metadata.spotify_tokens
 
-      if (fetchError) {
-        console.error('❌ Could not fetch tokens:', fetchError.message)
+      if (!spotifyTokens) {
+        console.warn('⚠️ No Spotify tokens found in user metadata')
         setLoading(false)
         return
       }
 
-      const token = userData?.spotify_access_token
-      const refreshToken = userData?.spotify_refresh_token
-      setAccessToken(token)
+      // Check if token is expired
+      const isTokenExpired = Date.now() > spotifyTokens.expires_at
 
-      if (!token) {
-        console.warn('⚠️ No Spotify access token stored yet')
-        setLoading(false)
-        return
-      }
+      let accessToken = spotifyTokens.access_token
 
-      // Try Now Playing
-      const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      // Refresh token if expired
+      if (isTokenExpired && spotifyTokens.refresh_token) {
+        try {
+          const refreshResponse = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': 'Basic ' + Buffer.from(`${process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64')
+            },
+            body: new URLSearchParams({
+              grant_type: 'refresh_token',
+              refresh_token: spotifyTokens.refresh_token
+            })
+          })
 
-      if (res.status === 401 && refreshToken) {
-        console.log('🎯 Token expired, refreshing...')
-        const refreshed = await fetch('/api/refresh', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        }).then(r => r.json())
+          const refreshedTokens = await refreshResponse.json()
 
-        if (refreshed.access_token) {
-          await supabase
-            .from('users')
-            .update({ spotify_access_token: refreshed.access_token })
-            .eq('id', user.id)
+          if (refreshedTokens.access_token) {
+            // Update user metadata with new tokens
+            const { error } = await supabase.auth.updateUser({
+              data: {
+                spotify_tokens: {
+                  ...spotifyTokens,
+                  access_token: refreshedTokens.access_token,
+                  expires_at: Date.now() + (refreshedTokens.expires_in * 1000)
+                }
+              }
+            })
 
-          setAccessToken(refreshed.access_token)
-          await fetchNowPlaying(refreshed.access_token)
-          await fetchDevices(refreshed.access_token)
+            if (error) {
+              console.error('❌ Failed to update Spotify tokens:', error)
+            } else {
+              accessToken = refreshedTokens.access_token
+              console.log('✅ Spotify tokens refreshed successfully')
+            }
+          }
+        } catch (error) {
+          console.error('❌ Token refresh failed:', error)
         }
-      } else {
-        await fetchNowPlaying(token)
-        await fetchDevices(token)
+      }
+
+      setAccessToken(accessToken)
+
+      // Fetch Spotify data
+      try {
+        await fetchNowPlaying(accessToken)
+        await fetchDevices(accessToken)
+      } catch (error) {
+        console.error('❌ Failed to fetch Spotify data:', error)
       }
 
       setLoading(false)
