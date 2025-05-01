@@ -25,6 +25,12 @@ interface ErrorDetails {
   responseBody?: any
   message?: string
   body?: any
+  method?: string
+  originalBody?: any
+  bodyType?: string
+  codeType?: string
+  userIdType?: string
+  parseError?: string
 }
 
 interface ErrorResponse {
@@ -38,33 +44,68 @@ export default async function handler(
   req: NextApiRequest, 
   res: NextApiResponse<TokenExchangeResponse>
 ) {
+  // Validate request method
+  if (req.method !== 'POST') {
+    console.error('❌ Invalid request method:', req.method)
+    return res.status(405).json({
+      error: 'Method Not Allowed',
+      details: { method: req.method }
+    })
+  }
+
   // Log full request details for debugging
   console.log('Incoming Request:', {
     method: req.method,
     body: req.body,
     query: req.query,
+    rawBody: req.body,
     headers: {
       'content-type': req.headers['content-type'],
       'user-agent': req.headers['user-agent']
     }
   })
 
-  const { code, user_id } = req.body as TokenRequestBody
+  // Parse request body with extra safety
+  let parsedBody: TokenRequestBody
+  try {
+    parsedBody = typeof req.body === 'string' 
+      ? JSON.parse(req.body) 
+      : req.body as TokenRequestBody
+  } catch (parseError) {
+    console.error('❌ Failed to parse request body', parseError)
+    return res.status(400).json({
+      error: 'Invalid request body',
+      details: { 
+        originalBody: req.body,
+        parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      }
+    })
+  }
+
+  const { code, user_id } = parsedBody
 
   // Validate incoming request
   if (!code) {
-    console.error('❌ Missing authorization code')
+    console.error('❌ Missing authorization code', { parsedBody })
     return res.status(400).json({
       error: 'Missing authorization code',
-      details: { body: req.body }
+      details: { 
+        body: parsedBody,
+        bodyType: typeof parsedBody,
+        codeType: typeof code
+      }
     })
   }
 
   if (!user_id) {
-    console.error('❌ Missing user ID')
+    console.error('❌ Missing user ID', { parsedBody })
     return res.status(400).json({
       error: 'Missing user ID',
-      details: { body: req.body }
+      details: { 
+        body: parsedBody,
+        bodyType: typeof parsedBody,
+        userIdType: typeof user_id
+      }
     })
   }
 
