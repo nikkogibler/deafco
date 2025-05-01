@@ -18,8 +18,22 @@ export default function Dashboard() {
     if (!router.isReady) return
 
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+      // ✅ Handle Spotify OAuth redirect BEFORE anything else
+      if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
+        console.log('🎯 Spotify redirect detected. Running session exchange...')
+        window.sessionStorage.setItem('spotify_code_used', 'true')
 
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+        if (error) {
+          console.error('❌ exchangeCodeForSession failed:', error.message)
+          return
+        }
+
+        router.replace('/dashboard')
+        return // prevent rest of checkSession from running early
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) {
         console.log('❌ No session found, redirecting to login...')
         router.push('/login')
@@ -28,62 +42,6 @@ export default function Dashboard() {
 
       const user = session.user
       console.log('✅ Authenticated session for:', user.email)
-      console.log('🌐 Router query at load:', router.query)
-
-      // 🌐 Check for ?code=... and exchange it via secure API
-      if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
-  window.sessionStorage.setItem('spotify_code_used', 'true')
-
-  const code = router.query.code as string
-  console.log('🎯 Code detected from URL:', code)
-
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href)
-  if (exchangeError) {
-    console.error('❌ Failed to exchange code:', exchangeError.message)
-    return
-  }
-
-  const tokenResponse = await fetch('/api/spotify-token', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ code }),
-})
-const tokenData = await tokenResponse.json()
-console.log('🎧 Spotify token response (via API):', tokenData)
-
-  if (!tokenData?.access_token || !tokenData?.refresh_token) {
-  console.error('❌ Missing tokens from response — aborting')
-  return
-}
-
-const { data: sessionData } = await supabase.auth.getSession()
-const userId = sessionData?.session?.user?.id
-console.log('🧠 Session user ID for token save:', userId)
-
-if (!userId) {
-  console.error('❌ No Supabase session found — cannot save tokens')
-  return
-}
-
-const { error: tokenSaveError, data: savedData } = await supabase
-  .from('users')
-  .update({
-    spotify_access_token: tokenData.access_token,
-    spotify_refresh_token: tokenData.refresh_token,
-    token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-  })
-  .eq('id', userId)
-  .select()
-
-if (tokenSaveError) {
-  console.error('❌ Token save failed:', tokenSaveError.message)
-} else {
-  console.log('✅ Spotify tokens saved for user:', userId)
-  setAccessToken(tokenData.access_token)
-  router.replace('/dashboard') // cleans up ?code= from URL
-}
-}
-
 
       // Ensure user row exists
       const { error: insertError } = await supabase.from('users').upsert({
@@ -200,7 +158,6 @@ if (tokenSaveError) {
       <div className="absolute top-8">
         <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={480} height={120} />
       </div>
-
       <div className="absolute top-8 right-8">
         <Image src="/spotify-logo.png" alt="Spotify" width={40} height={40} />
       </div>
