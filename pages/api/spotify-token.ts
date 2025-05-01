@@ -40,8 +40,10 @@ interface ErrorDetails {
   supabaseError?: string
   errorMessage?: string
   userId?: string
-  code?: 'Present' | 'Missing'
-  user_id?: 'Present' | 'Missing'
+  originalResponse?: string
+  responseText?: string
+  bodyKeys?: string[]
+  requestBody?: any
 }
 
 interface ErrorResponse {
@@ -120,28 +122,42 @@ export default async function handler(
 
   // Validate incoming request
   if (!code) {
-    console.error('❌ Missing authorization code', { parsedBody })
+    console.error('❌ Missing authorization code', {
+      requestBody: req.body,
+      codeType: typeof code,
+      bodyKeys: Object.keys(req.body || {})
+    })
     return res.status(400).json({
       error: 'Missing authorization code',
       details: { 
-        body: parsedBody,
-        bodyType: typeof parsedBody,
-        codeType: typeof code
+        codeType: typeof code,
+        bodyKeys: Object.keys(req.body || {})
       }
     })
   }
 
   if (!user_id) {
-    console.error('❌ Missing user ID', { parsedBody })
+    console.error('❌ Missing user ID', {
+      requestBody: req.body,
+      userIdType: typeof user_id,
+      bodyKeys: Object.keys(req.body || {})
+    })
     return res.status(400).json({
       error: 'Missing user ID',
       details: { 
-        body: parsedBody,
-        bodyType: typeof parsedBody,
-        userIdType: typeof user_id
+        userIdType: typeof user_id,
+        bodyKeys: Object.keys(req.body || {})
       }
     })
   }
+
+  // Additional diagnostic logging
+  console.log('🕵️ Request Body Deep Inspection', {
+    bodyType: typeof req.body,
+    bodyKeys: Object.keys(req.body || {}),
+    bodyStringified: JSON.stringify(req.body),
+    headers: req.headers
+  })
 
   // Comprehensive environment variable logging
   console.log('Full Environment:', {
@@ -195,6 +211,15 @@ export default async function handler(
   })
 
   try {
+    // Comprehensive token exchange diagnostics
+    console.log('🔍 Detailed Token Exchange Attempt', {
+      clientId: clientId ? 'Present' : 'Missing',
+      clientSecretLength: clientSecret?.length || 0,
+      code: code ? `Present (length: ${code.length})` : 'Missing',
+      redirectUri,
+      fullAuthHeader: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`.slice(0, 20) + '...' // Mask sensitive info
+    })
+
     // Spotify token exchange request
     const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
@@ -209,25 +234,33 @@ export default async function handler(
       })
     })
 
-    // Check token exchange response
+    // Detailed token exchange response logging
+    const responseText = await tokenResponse.text()
+    console.log('🔎 Token Exchange Full Response', {
+      status: tokenResponse.status,
+      statusText: tokenResponse.statusText,
+      responseLength: responseText.length,
+      responseText: responseText.slice(0, 500) // Limit log size
+    })
+
+    // Validate token response
     if (!tokenResponse.ok) {
-      const errorText = await tokenResponse.text()
       console.error('❌ Spotify Token Exchange Failed', {
         status: tokenResponse.status,
         statusText: tokenResponse.statusText,
-        errorText
+        responseText
       })
-      return res.status(400).json({
-        error: 'Failed to exchange token',
+      return res.status(tokenResponse.status).json({
+        error: 'Spotify token exchange failed',
         details: {
           spotifyResponseStatus: tokenResponse.status,
-          spotifyResponseText: errorText
+          spotifyResponseText: responseText
         }
       })
     }
 
     // Parse token response
-    const tokenData: SpotifyTokenResponse = await tokenResponse.json()
+    const tokenData: SpotifyTokenResponse = JSON.parse(responseText)
 
     // Initialize Supabase client
     const supabase = createClient(
