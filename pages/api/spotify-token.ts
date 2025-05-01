@@ -170,43 +170,73 @@ export default async function handler(
       effectiveUri: effectiveRedirectUri
     })
 
-    // Spotify token exchange with enhanced error handling
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        code,
-        redirect_uri: effectiveRedirectUri,
-      }),
+    // Comprehensive logging of token exchange request details
+    console.log('🔐 Spotify Token Exchange Request Details', {
+      clientIdLength: clientId.length,
+      clientSecretMasked: clientSecret.slice(0, 4) + '...' + clientSecret.slice(-4),
+      redirectUri: effectiveRedirectUri,
+      codeLength: code.length,
+      codeFirstChars: code.slice(0, 10) + '...'
     })
 
-    // Capture raw response text for more detailed logging
-    const responseText = await response.text()
-    let tokenData;
+    // Spotify token exchange with enhanced error handling
+    let responseText = '';
+    let responseStatus = 0;
     try {
-      tokenData = JSON.parse(responseText)
-    } catch (parseError) {
-      console.error('❌ Failed to parse Spotify response', {
-        rawResponse: responseText,
-        parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: effectiveRedirectUri,
+        }),
       })
-      return res.status(500).json({
-        error: 'Failed to parse Spotify response',
-        details: { rawResponse: responseText }
+
+      responseStatus = response.status;
+      responseText = await response.text();
+
+      console.log('🌊 Spotify Token Exchange Raw Response', {
+        status: responseStatus,
+        responseText
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${responseStatus}`)
+      }
+
+      const tokenData = JSON.parse(responseText)
+
+      console.log('💰 Token Exchange Successful', {
+        accessTokenLength: tokenData.access_token?.length || 0,
+        refreshTokenLength: tokenData.refresh_token?.length || 0,
+        expiresIn: tokenData.expires_in
+      })
+
+      return res.status(200).json(tokenData)
+
+    } catch (error) {
+      console.error('❌ Spotify Token Exchange Failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        responseStatus,
+        responseText,
+        code,
+        redirectUri: effectiveRedirectUri
+      })
+
+      return res.status(400).json({
+        error: 'Token exchange failed',
+        details: {
+          responseStatus,
+          responseText: responseText.slice(0, 500), // Limit response text length
+          code: code.slice(0, 10) + '...'
+        }
       })
     }
 
-    // Detailed logging for token exchange response
-    console.log('🎵 Spotify Token Exchange Response', {
-      status: response.status,
-      ok: response.ok,
-      responseBody: JSON.stringify(tokenData).slice(0, 500), // Limit log size
-      errorDetails: tokenData.error ? {
-        error: tokenData.error,
         description: tokenData.error_description
       } : null
     })
