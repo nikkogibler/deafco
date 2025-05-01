@@ -104,7 +104,7 @@ export default async function handler(
       supabaseUrlPresent: !!supabaseUrl,
       
       // Request Details
-      redirectUri,
+      possibleRedirectUris,
       codeLength: code.length,
       codeFirstChars: code.slice(0, 10) + '...',
       
