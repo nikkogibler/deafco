@@ -13,18 +13,61 @@ interface SpotifyTokenResponse {
   expires_in: number
 }
 
+interface ErrorResponse {
+  error: string
+  details?: {
+    clientId?: boolean
+    clientSecret?: boolean
+    environment?: {
+      NODE_ENV?: string
+      VERCEL?: string
+      VERCEL_ENV?: string
+    }
+  }
+}
+
 export default async function handler(
   req: NextApiRequest, 
-  res: NextApiResponse<SpotifyTokenResponse | { error: string }>
+  res: NextApiResponse<SpotifyTokenResponse | ErrorResponse>
 ) {
   const { code, user_id } = req.body as TokenRequestBody
 
+  // Comprehensive environment variable logging
+  console.log('Full Environment:', {
+    NEXT_PUBLIC_SPOTIFY_CLIENT_ID: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID ? 'Present' : 'Missing',
+    SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ? 'Present' : 'Missing',
+    NODE_ENV: process.env.NODE_ENV,
+    VERCEL: process.env.VERCEL,
+    VERCEL_ENV: process.env.VERCEL_ENV
+  })
+
+  // Log the actual values (masked for security)
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   const redirectUri = 'https://deafco.vercel.app/dashboard'
 
+  console.log('Credentials Check:', {
+    clientIdLength: clientId?.length,
+    clientSecretLength: clientSecret?.length
+  })
+
   if (!clientId || !clientSecret) {
-    return res.status(500).json({ error: 'Missing Spotify credentials' })
+    console.error('❌ Critical: Missing Spotify credentials', {
+      clientIdStatus: clientId ? 'Present' : 'Missing',
+      clientSecretStatus: clientSecret ? 'Present' : 'Missing'
+    })
+    return res.status(500).json({ 
+      error: 'Missing Spotify credentials', 
+      details: {
+        clientId: !!clientId,
+        clientSecret: !!clientSecret,
+        environment: {
+          NODE_ENV: process.env.NODE_ENV,
+          VERCEL: process.env.VERCEL,
+          VERCEL_ENV: process.env.VERCEL_ENV
+        }
+      }
+    })
   }
 
   const response = await fetch('https://accounts.spotify.com/api/token', {
