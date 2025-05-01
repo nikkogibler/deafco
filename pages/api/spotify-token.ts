@@ -412,7 +412,8 @@ export default async function handler(
     return res.status(200).json(tokenData)
   } catch (error) {
     // Enhanced error logging and diagnostics
-  console.error('🔥 Critical Token Exchange Error', {
+  // Comprehensive error logging with multiple methods
+  const errorLog = {
     errorType: error instanceof Error ? error.constructor.name : 'Unknown',
     errorMessage: error instanceof Error ? error.message : 'Unknown error',
     errorStack: error instanceof Error ? error.stack : 'No stack trace',
@@ -426,7 +427,28 @@ export default async function handler(
       nodeVersion: process.version,
       platform: process.platform
     }
-  })
+  }
+
+  // Multiple logging methods for maximum visibility
+  console.error('🔥 Critical Token Exchange Error', errorLog)
+  console.log(JSON.stringify({
+    level: 'ERROR',
+    message: 'Spotify Token Exchange Failure',
+    ...errorLog
+  }, null, 2))
+
+  // Optional: Send to external logging service if configured
+  if (process.env.LOGGING_SERVICE_URL) {
+    try {
+      await fetch(process.env.LOGGING_SERVICE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(errorLog)
+      })
+    } catch (logError) {
+      console.error('Failed to send error to logging service', logError)
+    }
+  }
 
   return res.status(500).json({ 
     error: 'Token exchange failed', 
