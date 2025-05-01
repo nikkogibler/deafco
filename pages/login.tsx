@@ -1,6 +1,4 @@
 
-LOGIN 
-
 'use client'
 
 import { useState } from 'react'
