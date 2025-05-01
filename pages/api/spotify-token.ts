@@ -1,16 +1,62 @@
 import { createClient } from '@supabase/supabase-js'
+import type { NextApiRequest, NextApiResponse } from 'next'
 
-export default async function handler(req, res) {
+// Define the shape of the request body
+interface SpotifyTokenRequestBody {
+  code?: string
+  userId?: string
+  user_id?: string
+}
+
+export default async function handler(
+  req: NextApiRequest, 
+  res: NextApiResponse
+) {
   // Validate request method
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { code, userId } = req.body
+  // Log full request body for debugging
+  console.log('Incoming Request Body:', {
+    body: req.body,
+    bodyType: typeof req.body,
+    bodyKeys: Object.keys(req.body || {})
+  })
 
-  // Validate inputs
-  if (!code || !userId) {
-    return res.status(400).json({ error: 'Missing code or userId' })
+  // Extract code and userId, prioritizing snake_case
+  const { code, user_id, userId } = req.body as SpotifyTokenRequestBody || {}
+  const resolvedUserId = user_id || userId
+
+  // Validate inputs with more detailed logging
+  if (!code) {
+    console.error('❌ Missing authorization code', {
+      providedBody: req.body,
+      codeValue: code,
+      bodyKeys: Object.keys(req.body || {})
+    })
+    return res.status(400).json({ 
+      error: 'Missing authorization code',
+      details: {
+        providedBody: req.body,
+        bodyKeys: Object.keys(req.body || {})
+      }
+    })
+  }
+
+  if (!resolvedUserId) {
+    console.error('❌ Missing user ID', {
+      providedBody: req.body,
+      userIdValue: resolvedUserId,
+      bodyKeys: Object.keys(req.body || {})
+    })
+    return res.status(400).json({ 
+      error: 'Missing user ID',
+      details: {
+        providedBody: req.body,
+        bodyKeys: Object.keys(req.body || {})
+      }
+    })
   }
 
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
