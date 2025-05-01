@@ -32,61 +32,59 @@ export default function Dashboard() {
 
       // 🌐 Check for ?code=... and exchange it via secure API
       if (router.query.code && !window.sessionStorage.getItem('spotify_code_used')) {
-        window.sessionStorage.setItem('spotify_code_used', 'true')
+  window.sessionStorage.setItem('spotify_code_used', 'true')
 
-        const code = router.query.code as string
-        console.log('🎯 Code detected from URL:', code)
-        
- //REMOVE THIS IF IT BREAKS THE FLOW
+  const code = router.query.code as string
+  console.log('🎯 Code detected from URL:', code)
 
-        
-const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href)
-
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.href)
   if (exchangeError) {
     console.error('❌ Failed to exchange code:', exchangeError.message)
     return
   }
-        // 
 
-        
-        const tokenResponse = await fetch('/api/spotify-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code }),
-        })
+  const tokenResponse = await fetch('/api/spotify-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  })
 
-        const tokenData = await tokenResponse.json()
-        console.log('🎧 Spotify token response (via API):', tokenData)
+  const tokenData = await tokenResponse.json()
+  console.log('🎧 Spotify token response (via API):', tokenData)
 
-        if (tokenData.access_token && tokenData.refresh_token) {
-          const { data: freshSession } = await supabase.auth.getSession()
-          const freshUserId = freshSession?.session?.user?.id
+  if (!tokenData?.access_token || !tokenData?.refresh_token) {
+    console.error('❌ Missing tokens from response — aborting')
+    return
+  }
 
-          console.log('🧠 Trying to update user ID:', freshUserId)
+  const { data: freshSession } = await supabase.auth.getSession()
+  const freshUserId = freshSession?.session?.user?.id
+  console.log('🧠 Session user ID:', freshUserId)
 
-          if (!freshUserId) {
-            console.error('❌ No valid session found during token save')
-          } else {
-            const { error: tokenSaveError, data: savedData } = await supabase
-              .from('users')
-              .update({
-                spotify_access_token: tokenData.access_token,
-                spotify_refresh_token: tokenData.refresh_token,
-                token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
-              })
-              .eq('id', freshUserId)
-              .select()
+  if (!freshUserId) {
+    console.error('❌ No valid session found during token save')
+    return
+  }
 
-            if (tokenSaveError) {
-              console.error('❌ Token save failed:', tokenSaveError.message)
-            } else {
-              console.log('✅ Spotify tokens saved:', savedData)
-              setAccessToken(tokenData.access_token)
-              router.replace('/dashboard')
-            }
-          }
-        }
-      }
+  const { error: tokenSaveError, data: savedData } = await supabase
+    .from('users')
+    .update({
+      spotify_access_token: tokenData.access_token,
+      spotify_refresh_token: tokenData.refresh_token,
+      token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000),
+    })
+    .eq('id', freshUserId)
+    .select()
+
+  if (tokenSaveError) {
+    console.error('❌ Token save failed:', tokenSaveError.message)
+  } else {
+    console.log('✅ Spotify tokens saved:', savedData)
+    setAccessToken(tokenData.access_token)
+    router.replace('/dashboard') // cleans up the URL
+  }
+}
+
 
       // Ensure user row exists
       const { error: insertError } = await supabase.from('users').upsert({
