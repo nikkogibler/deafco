@@ -1,4 +1,3 @@
-DASHBOARD GOOD
 
 'use client'
 
