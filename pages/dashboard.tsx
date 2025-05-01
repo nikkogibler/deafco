@@ -36,7 +36,18 @@ export default function Dashboard() {
 
         const code = router.query.code as string
         console.log('🎯 Code detected from URL:', code)
+        
+ //REMOVE THIS IF IT BREAKS THE FLOW
 
+        
+const { error: exchangeError } = await supabase.auth.exchangeCodeForSession()
+  if (exchangeError) {
+    console.error('❌ Failed to exchange code:', exchangeError.message)
+    return
+  }
+        // 
+
+        
         const tokenResponse = await fetch('/api/spotify-token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
