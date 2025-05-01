@@ -43,26 +43,45 @@ export default function Dashboard() {
 
       setUserEmail(user.email)
 
-      // Retrieve Spotify tokens from user metadata
+      // Comprehensive token retrieval
       const spotifyTokens = user.user_metadata.spotify_tokens
 
-      if (!spotifyTokens) {
-        console.warn('⚠️ No Spotify tokens found in user metadata')
-        // Instead of stopping loading, prompt user to connect Spotify
+      console.log('🔍 User Metadata Full:', user.user_metadata)
+
+      // Detailed token logging
+      console.log('🔑 Token Retrieval:', {
+        hasUserMetadata: !!user.user_metadata,
+        hasSpotifyTokens: !!spotifyTokens,
+        accessTokenPresent: !!spotifyTokens?.access_token,
+        refreshTokenPresent: !!spotifyTokens?.refresh_token
+      })
+
+      if (!spotifyTokens || !spotifyTokens.access_token) {
+        console.warn('⚠️ No valid Spotify tokens found')
         setAccessToken(null)
         setLoading(false)
         return
       }
 
-      // Log token details for debugging
-      console.log('🔑 Spotify Tokens:', {
-        hasAccessToken: !!spotifyTokens.access_token,
-        hasRefreshToken: !!spotifyTokens.refresh_token,
-        expiresAt: new Date(spotifyTokens.expires_at).toISOString()
+      // Validate token structure
+      if (!spotifyTokens.access_token || !spotifyTokens.expires_at) {
+        console.error('❌ Invalid token structure', spotifyTokens)
+        setAccessToken(null)
+        setLoading(false)
+        return
+      }
+
+      // Detailed token expiration logging
+      const currentTime = Date.now()
+      const expirationTime = spotifyTokens.expires_at
+      console.log('⏱ Token Timing:', {
+        currentTime,
+        expirationTime,
+        timeRemaining: expirationTime - currentTime
       })
 
       // Check if token is expired
-      const isTokenExpired = Date.now() > spotifyTokens.expires_at
+      const isTokenExpired = currentTime > expirationTime
 
       let accessToken = spotifyTokens.access_token
 
