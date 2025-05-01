@@ -48,9 +48,18 @@ export default function Dashboard() {
 
       if (!spotifyTokens) {
         console.warn('⚠️ No Spotify tokens found in user metadata')
+        // Instead of stopping loading, prompt user to connect Spotify
+        setAccessToken(null)
         setLoading(false)
         return
       }
+
+      // Log token details for debugging
+      console.log('🔑 Spotify Tokens:', {
+        hasAccessToken: !!spotifyTokens.access_token,
+        hasRefreshToken: !!spotifyTokens.refresh_token,
+        expiresAt: new Date(spotifyTokens.expires_at).toISOString()
+      })
 
       // Check if token is expired
       const isTokenExpired = Date.now() > spotifyTokens.expires_at
@@ -160,58 +169,84 @@ export default function Dashboard() {
     )
   }
 
+  // If user is authenticated but Spotify is not connected
+  if (!accessToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col justify-center items-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-4">Connect Your Spotify</h1>
+          <p className="mb-6 text-gray-300">To use DeafCo, please connect your Spotify account</p>
+          <button
+            onClick={() => router.push('/login')}
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition duration-300"
+          >
+            Connect Spotify
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Full dashboard view when Spotify is connected
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center text-center px-4 pt-40" style={{ backgroundColor: '#141b24', color: 'white' }}>
-      <div className="absolute top-8">
-        <Image src="/sonicsuite-logo.png" alt="SonicSuite Logo" width={480} height={120} />
-      </div>
-
-      <div className="absolute top-8 right-8">
-        <Image src="/spotify-logo.png" alt="Spotify" width={40} height={40} />
-      </div>
-
-      <div className="flex flex-col items-center gap-4">
-        <h1 className="text-3xl font-bold mb-4">Welcome to the Dashboard</h1>
-
-        {userEmail && (
-          <>
-            <p className="mb-4">Logged in as: {userEmail}</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <div className="flex items-center space-x-4">
+            {userEmail && <p>Welcome, {userEmail}</p>}
             <button
-              onClick={handleLogout}
-              className="px-4 py-2 mb-8 bg-black text-white rounded-xl"
+              onClick={() => supabase.auth.signOut()}
+              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded"
             >
               Logout
             </button>
-          </>
-        )}
+          </div>
+        </div>
 
-        {nowPlaying?.item ? (
-          <div className="mb-10 flex flex-col items-center">
-            <h2 className="text-xl font-semibold">Now Playing:</h2>
-            <p className="mt-2 font-medium">{nowPlaying.item.name}</p>
-            <p className="text-sm text-gray-400">{nowPlaying.item.artists?.[0]?.name}</p>
-            <img
-              src={nowPlaying.item.album?.images?.[0]?.url}
-              alt="Album Cover"
-              className="w-48 h-48 mt-4 rounded-lg shadow-lg"
-            />
+        {nowPlaying ? (
+          <div className="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 className="text-2xl font-semibold mb-4">Now Playing</h2>
+            <div className="flex items-center">
+              {nowPlaying.item?.album?.images?.[0]?.url && (
+                <Image
+                  src={nowPlaying.item.album.images[0].url}
+                  alt="Album Cover"
+                  width={100}
+                  height={100}
+                  className="mr-4 rounded"
+                />
+              )}
+              <div>
+                <p className="text-xl font-bold">{nowPlaying.item?.name}</p>
+                <p className="text-gray-400">
+                  {nowPlaying.item?.artists
+                    ?.map((artist: any) => artist.name)
+                    .join(', ')}
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
-          <p className="text-gray-400 mb-6">No track currently playing.</p>
+          <p>No track currently playing</p>
         )}
 
-        <div className="w-full max-w-md">
-          <h2 className="text-xl font-semibold mb-2">Available Devices:</h2>
-          {devices.length === 0 ? (
-            <p className="text-gray-400">No active Spotify devices found.</p>
-          ) : (
+        <div className="bg-gray-800 rounded-lg p-6">
+          <h2 className="text-2xl font-semibold mb-4">Available Devices</h2>
+          {devices.length > 0 ? (
             <ul className="space-y-2">
-              {devices.map(device => (
-                <li key={device.id} className="flex justify-between items-center border border-gray-700 p-2 rounded-md">
-                  <span>{device.name} {device.is_active && '✅'}</span>
+              {devices.map((device) => (
+                <li
+                  key={device.id}
+                  className="bg-gray-700 p-3 rounded flex justify-between items-center"
+                >
+                  <span>{device.name}</span>
+                  <span className="text-sm text-gray-400">{device.type}</span>
                 </li>
               ))}
             </ul>
+          ) : (
+            <p>No devices available</p>
           )}
         </div>
       </div>
