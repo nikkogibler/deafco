@@ -29,30 +29,36 @@ export default function Login() {
 
   const handleSpotifyLogin = async () => {
     setIsLoading(true)
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'spotify',
-      options: {
-        scopes: [
-          'user-read-email',
-          'user-read-private',
-          'user-read-playback-state',
-          'user-read-currently-playing',
-          'user-modify-playback-state',
-          'user-top-read',
-          'streaming',
-          'user-library-read'
-        ].join(' '),
-        redirectTo: 'https://deafco.vercel.app/dashboard',
-        queryParams: {
-          // Explicitly request offline access to get refresh token
-          prompt: 'consent'
-        }
-      },
-    })
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'spotify',
+        options: {
+          scopes: [
+            'user-read-email',
+            'user-read-private',
+            'user-read-playback-state',
+            'user-read-currently-playing',
+            'user-modify-playback-state',
+            'user-top-read',
+            'streaming',
+            'user-library-read'
+          ].join(' '),
+          redirectTo: window.location.origin + '/dashboard',
+          queryParams: {
+            // Explicitly request offline access to get refresh token
+            prompt: 'consent'
+          }
+        },
+      })
 
-    if (error) {
-      console.error('Login error:', error)
-      alert(`Error: ${error.message}`)
+      if (error) {
+        console.error('❌ Login error:', error)
+        alert(`Error: ${error.message}`)
+        setIsLoading(false)
+      }
+    } catch (err) {
+      console.error('❌ Unexpected login error:', err)
+      alert('An unexpected error occurred during login')
       setIsLoading(false)
     }
   }
