@@ -24,6 +24,7 @@ interface ErrorDetails {
   responseStatus?: number
   responseBody?: any
   message?: string
+  body?: any
 }
 
 interface ErrorResponse {
@@ -37,7 +38,35 @@ export default async function handler(
   req: NextApiRequest, 
   res: NextApiResponse<TokenExchangeResponse>
 ) {
+  // Log full request details for debugging
+  console.log('Incoming Request:', {
+    method: req.method,
+    body: req.body,
+    query: req.query,
+    headers: {
+      'content-type': req.headers['content-type'],
+      'user-agent': req.headers['user-agent']
+    }
+  })
+
   const { code, user_id } = req.body as TokenRequestBody
+
+  // Validate incoming request
+  if (!code) {
+    console.error('❌ Missing authorization code')
+    return res.status(400).json({
+      error: 'Missing authorization code',
+      details: { body: req.body }
+    })
+  }
+
+  if (!user_id) {
+    console.error('❌ Missing user ID')
+    return res.status(400).json({
+      error: 'Missing user ID',
+      details: { body: req.body }
+    })
+  }
 
   // Comprehensive environment variable logging
   console.log('Full Environment:', {
