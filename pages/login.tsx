@@ -43,7 +43,7 @@ export default function Login() {
             'streaming',
             'user-library-read'
           ].join(' '),
-          redirectTo: window.location.origin + '/dashboard',
+          redirectTo: window.location.origin + '/callback',
           queryParams: {
             // Explicitly request offline access to get refresh token
             prompt: 'consent'
