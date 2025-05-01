@@ -70,23 +70,59 @@ export default async function handler(
     })
   }
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-    }),
-  })
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }),
+    })
 
-  const tokenData = await response.json() as SpotifyTokenResponse
+    console.log('Spotify Token Exchange Response:', {
+      status: response.status,
+      statusText: response.statusText
+    })
 
-  if (!response.ok) {
-    return res.status(400).json({ error: 'Failed to exchange token' })
+    const tokenData = await response.json()
+
+    console.log('Raw Token Response:', tokenData)
+
+    if (!response.ok) {
+      console.error('❌ Token Exchange Failed:', {
+        status: response.status,
+        body: tokenData
+      })
+      return res.status(400).json({ 
+        error: 'Failed to exchange token', 
+        details: {
+          responseStatus: response.status,
+          responseBody: tokenData
+        }
+      })
+    }
+
+    // Validate token response
+    if (!tokenData.access_token || !tokenData.refresh_token) {
+      console.error('❌ Invalid Token Response:', tokenData)
+      return res.status(400).json({ 
+        error: 'Invalid token response', 
+        details: tokenData 
+      })
+    }
+
+    return res.status(200).json(tokenData as SpotifyTokenResponse)
+  } catch (error) {
+    console.error('🔥 Critical Token Exchange Error:', error)
+    return res.status(500).json({ 
+      error: 'Token exchange failed', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    })
   }
 
   // Initialize Supabase client
