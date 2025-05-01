@@ -63,6 +63,54 @@ export default async function handler(
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  // Initialize Supabase client early for potential code tracking
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+  // Check if this code has been used before (basic prevention)
+  const codeUsageKey = `spotify_code_used:${code}`
+  
+  // Check existing code usage
+  const { data: existingCodeUsage, error: checkError } = await supabase
+    .from('spotify_code_tracking')
+    .select('*')
+    .eq('code', code)
+    .single()
+
+  if (existingCodeUsage) {
+    console.error('❌ Authorization code already used', {
+      code,
+      previousUserId: existingCodeUsage.user_id,
+      currentUserId: resolvedUserId
+    })
+    return res.status(400).json({
+      error: 'Authorization code has already been used',
+      details: {
+        previousUsage: existingCodeUsage ? 'Yes' : 'No'
+      }
+    })
+  }
+
+  // Optional: Log code tracking for future reference
+  const { error: trackingError } = await supabase
+    .from('spotify_code_tracking')
+    .insert({
+      code,
+      user_id: resolvedUserId,
+      created_at: new Date().toISOString()
+    })
+
+  // Log any tracking insert errors
+  if (trackingError) {
+    console.error('❌ Failed to log authorization code', {
+      error: trackingError,
+      code,
+      userId: resolvedUserId
+    })
+    // Non-critical error, so we'll continue with token exchange
+    // But log it for investigation
+  }
+
   // Define possible redirect URIs
   const possibleRedirectUris = [
     'https://deafco.vercel.app/dashboard',
